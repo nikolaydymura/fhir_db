@@ -6,6 +6,9 @@ import 'package:fhir/r4.dart';
 import 'fhir_db.dart';
 
 class FhirDbDao {
+  /// Singleton factory
+  factory FhirDbDao() => _fhirFhirDbDao;
+
   /// Private Constructor
   FhirDbDao._() {
     _fhirDb = FhirDb();
@@ -19,9 +22,6 @@ class FhirDbDao {
 
   /// Singleton Instance
   static final FhirDbDao _fhirFhirDbDao = FhirDbDao._();
-
-  /// Singleton factory
-  factory FhirDbDao() => _fhirFhirDbDao;
 
   /// Initalizes the database, configure its path, and return it
   Future<FhirDb> init(String path) async {
@@ -53,16 +53,18 @@ class FhirDbDao {
   /// this method does not check if the resource is already in the database,
   /// and will therefore overwrite it if it is
   Future<bool> bulkSave(String? password, List<Resource> resources) async {
-    final resourceMap =
+    final Map<R4ResourceType, Set<Map<String, Map<String, dynamic>>>>
+        resourceMap =
         <R4ResourceType, Set<Map<String, Map<String, dynamic>>>>{};
 
-    resources.forEach((resource) {
+    for (final Resource resource in resources) {
       if (resource.resourceType != null) {
         if (!resourceMap.keys.contains(resource.resourceType)) {
-          resourceMap[resource.resourceType!] = {};
+          resourceMap[resource.resourceType!] =
+              <Map<String, Map<String, dynamic>>>{};
         }
         if (resource.id == null) {
-          final newResource = resource.newId();
+          final Resource newResource = resource.newId();
           resourceMap[resource.resourceType!]!
               .add(<String, Map<String, dynamic>>{
             newResource.id!: newResource.toJson()
@@ -72,13 +74,13 @@ class FhirDbDao {
               <String, Map<String, dynamic>>{resource.id!: resource.toJson()});
         }
       }
-    });
+    }
     return _fhirDb.bulkSave(resourceMap);
   }
 
   /// function used to save a new resource in the db
   Future<Resource> _insert(String? password, Resource resource) async {
-    final newResource = resource.updateVersion().newIdIfNoId();
+    final Resource newResource = resource.updateVersion().newIdIfNoId();
     await _fhirDb.save(newResource);
     return newResource;
   }
@@ -88,15 +90,15 @@ class FhirDbDao {
   Future<Resource> _update(String? password, Resource resource) async {
     if (resource.resourceTypeString != null) {
       if (resource.id != null) {
-        final dbResource =
+        final Map<String, dynamic>? dbResource =
             await _fhirDb.get(resource.resourceType!, resource.id!);
         if (dbResource != null) {
-          final oldResource = dbResource;
+          final Map<String, dynamic> oldResource = dbResource;
           await _fhirDb.saveHistory(oldResource);
-          final oldMeta = oldResource['meta'] == null
+          final FhirMeta? oldMeta = oldResource['meta'] == null
               ? null
-              : FhirMeta.fromJson(oldResource['meta']);
-          final newResource = resource.updateVersion(oldMeta: oldMeta);
+              : FhirMeta.fromJson(oldResource['meta'] as Map<String, dynamic>);
+          final Resource newResource = resource.updateVersion(oldMeta: oldMeta);
           await _fhirDb.save(newResource);
           return newResource;
         } else {
@@ -113,7 +115,8 @@ class FhirDbDao {
   /// function used to save a new resource in the db
   Future<Resource?> get(
       String? password, R4ResourceType resourceType, String id) async {
-    final resourceMap = await _fhirDb.get(resourceType, id);
+    final Map<String, dynamic>? resourceMap =
+        await _fhirDb.get(resourceType, id);
     return resourceMap == null ? null : Resource.fromJson(resourceMap);
   }
 
@@ -133,28 +136,33 @@ class FhirDbDao {
     Resource? resource,
     R4ResourceType? resourceType,
     String? id,
-    List? field,
+    List<Object>? field,
     String? value,
   }) async {
     /// if we're just trying to match a resource
     if (resource != null &&
         resource.resourceType != null &&
         (resource.id != null || id != null)) {
-      final newResource =
+      final Map<String, dynamic>? newResource =
           await fhirDb.get(resource.resourceType!, resource.id!);
-      return newResource == null ? [] : [Resource.fromJson(newResource)];
+      return newResource == null
+          ? <Resource>[]
+          : <Resource>[Resource.fromJson(newResource)];
     } else if (resourceType != null && id != null) {
-      final newResource = await fhirDb.get(resourceType, id);
-      return newResource == null ? [] : [Resource.fromJson(newResource)];
+      final Map<String, dynamic>? newResource =
+          await fhirDb.get(resourceType, id);
+      return newResource == null
+          ? <Resource>[]
+          : <Resource>[Resource.fromJson(newResource)];
     } else if (resourceType != null && field != null && value != null) {
-      bool Function(Map<String, dynamic>) finder =
-          (Map<String, dynamic> finderResource) {
+      bool finder(Map<String, dynamic> finderResource) {
         dynamic result = finderResource;
-        for (final key in field) {
+        for (final Object key in field) {
           result = result[key];
         }
         return result.toString() == value;
-      };
+      }
+
       return _search(resourceType, finder);
     } else {
       throw const FormatException('Must have either: '
@@ -171,7 +179,7 @@ class FhirDbDao {
     List<String>? resourceTypeStrings,
     Resource? resource,
   }) async {
-    final typeList = <R4ResourceType>{};
+    final Set<R4ResourceType> typeList = <R4ResourceType>{};
     if (resource?.resourceType != null) {
       typeList.add(resource!.resourceType!);
     }
@@ -179,18 +187,20 @@ class FhirDbDao {
       typeList.addAll(resourceTypes);
     }
     if (resourceTypeStrings != null) {
-      for (final type in resourceTypeStrings) {
-        final resourceType = resourceTypeFromStringMap[type];
+      for (final String type in resourceTypeStrings) {
+        final R4ResourceType? resourceType = resourceTypeFromStringMap[type];
         if (resourceType != null) {
           typeList.add(resourceType);
         }
       }
     }
 
-    final List<Resource> resourceList = [];
-    for (final type in typeList) {
-      final newResources = await _fhirDb.getActiveResourcesOfType(type);
-      resourceList.addAll(newResources.map((e) => Resource.fromJson(e)));
+    final List<Resource> resourceList = <Resource>[];
+    for (final R4ResourceType type in typeList) {
+      final Iterable<Map<String, dynamic>> newResources =
+          await _fhirDb.getActiveResourcesOfType(type);
+      resourceList.addAll(
+          newResources.map((Map<String, dynamic> e) => Resource.fromJson(e)));
     }
     return resourceList;
   }
@@ -198,7 +208,7 @@ class FhirDbDao {
   /// returns all resources in the [db], including historical versions
   Future<List<Resource>> getAllActiveResources(String? password) async =>
       (await _fhirDb.getAllActiveResources())
-          .map((e) => Resource.fromJson(e))
+          .map((Map<String, dynamic> e) => Resource.fromJson(e))
           .toList();
 
   /// Delete specific resource
@@ -212,9 +222,9 @@ class FhirDbDao {
     if (resource != null &&
         resource.resourceType != null &&
         resource.id != null) {
-      return await _fhirDb.deleteById(resource.resourceType!, resource.id!);
+      return _fhirDb.deleteById(resource.resourceType!, resource.id!);
     } else if (resourceType != null && id != null) {
-      return await _fhirDb.deleteById(resourceType, id);
+      return _fhirDb.deleteById(resourceType, id);
     } else if (resourceType != null && finder != null) {
       return _fhirDb.delete(resourceType, finder);
     } else {
@@ -246,27 +256,13 @@ class FhirDbDao {
   Future<bool> deleteAllResources(String? password) async =>
       _fhirDb.deleteAllData(password);
 
-  /// remove the resourceType from the list of types stored in the db
-  Future<bool> _removeResourceType(
-    String? password,
-    List<R4ResourceType> types,
-  ) async {
-    for (final type in types) {
-      final deleted = await deleteSingleType(password, resourceType: type);
-      if (!deleted) {
-        return false;
-      }
-    }
-    return true;
-  }
-
   /// ultimate search function, must pass in finder
   Future<List<Resource>> _search(
     R4ResourceType resourceType,
     bool Function(Map<String, dynamic>) finder,
   ) async =>
       (await _fhirDb.search(resourceType, finder))
-          .map((e) => Resource.fromJson(e))
+          .map((Map<String, dynamic> e) => Resource.fromJson(e))
           .toList();
 
   /// ************************************************************************
@@ -286,15 +282,20 @@ class FhirDbDao {
   Future<Iterable<Object>> getAllGeneral({String? password}) async =>
       _fhirDb.getAllGeneral();
 
+  Future<Iterable<Object>> searchGeneral({
+    String? password,
+    required bool Function(Object) finder,
+  }) async =>
+      _fhirDb.searchGeneral(finder);
+
   /// Delete specific entry
-  Future deleteFromGeneral(String password, int key) async =>
+  Future<bool> deleteFromGeneral(String password, int key) async =>
       _fhirDb.deletefromGeneral(password, key);
 
-  /// Deletes everything stored in the general store
-  Future deleteAllGeneral(String? password) async =>
-      _fhirDb.clearGeneral(password);
+  Future<bool> clearGeneral({String? password}) =>
+      _fhirDb.clearGeneral(password: password);
 
-  /// Find specific entry
-  // Future findGeneral(String? password, String key) async =>
-  //     await _fhirDb.record(key).get(await _db(password));
+  /// Deletes everything stored in the general store
+  Future<bool> deleteAllGeneral({String? password}) async =>
+      _fhirDb.clearGeneral(password: password);
 }
