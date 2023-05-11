@@ -5,7 +5,7 @@ import 'package:collection/collection.dart';
 import 'package:fhir/r4/resource/resource.dart';
 import 'package:hive/hive.dart';
 
-class HiveDb {
+class FhirDb {
   bool initialized = false;
   Set<R4ResourceType> _types = {};
 
@@ -13,15 +13,17 @@ class HiveDb {
   /// to true, register all of the ResourceTypeAdapters, and then assign the
   /// set of all of the types to the variable types
   Future<void> initDb(String? path) async {
-    Hive.init(path ?? '.');
-    initialized = true;
-    final Box<List<String>> typesBox =
-        await Hive.openBox<List<String>>('types');
-    _types = typesBox
-            .get('types')
-            ?.map((e) => Resource.resourceTypeFromString(e)!)
-            .toSet() ??
-        <R4ResourceType>{};
+    if (!initialized) {
+      Hive.init(path ?? '.');
+      initialized = true;
+      final Box<List<String>> typesBox =
+          await Hive.openBox<List<String>>('types');
+      _types = typesBox
+              .get('types')
+              ?.map((e) => Resource.resourceTypeFromString(e)!)
+              .toSet() ??
+          <R4ResourceType>{};
+    }
   }
 
   /// Convenience getter to ensure initialized
@@ -76,7 +78,40 @@ class HiveDb {
     }
   }
 
-  // TODO(Dokotela): saveAll - list of Resources
+  Future<bool> saveHistory(Map<String, dynamic> resource) async {
+    try {
+      await _ensureInit;
+      Box<Map<String, dynamic>> box;
+      if (!Hive.isBoxOpen('history')) {
+        box = await Hive.openBox('history');
+      } else {
+        box = Hive.box('history');
+      }
+      await box.put(
+          '${resource["resourceType"]}/${resource["id"]}/${resource["meta"]?["versionId"]}',
+          resource);
+      return true;
+    } catch (e, s) {
+      log('Error: $e, Stack at time of Error: $s');
+      return false;
+    }
+  }
+
+  Future<bool> bulkSave(
+      Map<R4ResourceType, Iterable<Map<String, Map<String, dynamic>>>>
+          resourceMap) async {
+    try {
+      await _ensureInit;
+      for (final type in resourceMap.keys) {
+        final Box<Map<String, dynamic>> box = await _getBox(type);
+        await box.addAll(resourceMap[type]!);
+      }
+      return true;
+    } catch (e, s) {
+      log('Error: $e, Stack at time of Error: $s');
+      return false;
+    }
+  }
 
   Future<bool> exists(R4ResourceType resourceType, String id) async {
     if (!_types.contains(resourceType)) {
@@ -111,27 +146,9 @@ class HiveDb {
     return allResources;
   }
 
-  Future<bool> saveHistory(Map<String, dynamic> resource) async {
-    try {
-      await _ensureInit;
-      Box<Map<String, dynamic>> box;
-      if (!Hive.isBoxOpen('history')) {
-        box = await Hive.openBox('history');
-      } else {
-        box = Hive.box('history');
-      }
-      await box.put(
-          '${resource["resourceType"]}/${resource["id"]}/${resource["meta"]?["versionId"]}',
-          resource);
-      return true;
-    } catch (e, s) {
-      log('Error: $e, Stack at time of Error: $s');
-      return false;
-    }
-  }
-
   Future<bool> deleteById(R4ResourceType resourceType, String id) async {
     try {
+      await _ensureInit;
       final Box<Map<String, dynamic>> box = await _getBox(resourceType);
       await box.delete(id);
       return true;
@@ -145,6 +162,7 @@ class HiveDb {
     bool Function(Map<String, dynamic>) finder,
   ) async {
     try {
+      await _ensureInit;
       final Box<Map<String, dynamic>> box = await _getBox(resourceType);
       final resourceId =
           box.values.firstWhereOrNull((element) => finder(element))?['id'];
@@ -159,6 +177,7 @@ class HiveDb {
 
   Future<bool> deleteSingleType(R4ResourceType resourceType) async {
     try {
+      await _ensureInit;
       final Box<Map<String, dynamic>> box = await _getBox(resourceType);
       await box.clear();
       return true;
@@ -169,6 +188,7 @@ class HiveDb {
 
   Future<bool> deleteAllData(String? password) async {
     try {
+      await _ensureInit;
       for (final type in _types) {
         final Box<Map<String, dynamic>> box = await _getBox(type);
         await box.deleteFromDisk();
@@ -180,6 +200,7 @@ class HiveDb {
   }
 
   Future<void> deleteDatabase(String? password) async {
+    await _ensureInit;
     await Hive.deleteFromDisk();
   }
 
@@ -194,5 +215,103 @@ class HiveDb {
     final boxData = box.toMap();
     boxData.removeWhere((key, value) => !finder(value));
     return boxData.values;
+  }
+
+  /// ************************************************************************
+  /// All of the above has been for FHIR resources and data, below is if you
+  /// need to store whatever else as well
+  /// ************************************************************************
+
+  Future<int> saveGeneral(String? password, Object object, int? key) async {
+    try {
+      final Box<Object> box;
+      if (!Hive.isBoxOpen('general')) {
+        box = await Hive.openBox('general');
+      } else {
+        box = Hive.box('general');
+      }
+      if (key == null) {
+        return box.add(object);
+      } else {
+        await box.put(key, object);
+        return key;
+      }
+    } catch (e) {
+      return -1;
+    }
+  }
+
+  Future<Object?> readGeneral(int key) async {
+    if (!initialized) {
+      await initDb(null);
+    }
+    final Box<Object> box;
+    if (!Hive.isBoxOpen('general')) {
+      box = await Hive.openBox('general');
+    } else {
+      box = Hive.box('general');
+    }
+    return await box.get(key);
+  }
+
+  Future<Iterable<Object>> getAllGeneral() async {
+    if (!initialized) {
+      await initDb(null);
+    }
+    final Box<Object> box;
+    if (!Hive.isBoxOpen('general')) {
+      box = await Hive.openBox('general');
+    } else {
+      box = Hive.box('general');
+    }
+    final boxData = box.toMap();
+    return boxData.values;
+  }
+
+  Future<Iterable<Object>> searchGeneral(
+    bool Function(Object) finder,
+  ) async {
+    if (!initialized) {
+      await initDb(null);
+    }
+    final Box<Object> box;
+    if (!Hive.isBoxOpen('general')) {
+      box = await Hive.openBox('general');
+    } else {
+      box = Hive.box('general');
+    }
+    final boxData = box.toMap();
+    boxData.removeWhere((key, value) => !finder(value));
+    return boxData.values;
+  }
+
+  Future<bool> deletefromGeneral(String? password, int key) async {
+    try {
+      final Box<Object> box;
+      if (!Hive.isBoxOpen('general')) {
+        box = await Hive.openBox('general');
+      } else {
+        box = Hive.box('general');
+      }
+      await box.delete(key);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  Future<bool> clearGeneral(String? password) async {
+    try {
+      final Box<Object> box;
+      if (!Hive.isBoxOpen('general')) {
+        box = await Hive.openBox('general');
+      } else {
+        box = Hive.box('general');
+      }
+      await box.clear();
+      return true;
+    } catch (e) {
+      return false;
+    }
   }
 }

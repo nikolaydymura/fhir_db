@@ -9,14 +9,13 @@ environment:
 
 dependencies:
   collection: ^1.17.0
-  crypto: ^3.0.2
-  encrypt: ^5.0.1
   # fhir: ^0.9.5
   fhir:
     path: ../fhir/fhir
+  fhir_bulk:
+    path: ../fhir/fhir_bulk
   hive: ^2.2.3
   path: ^1.8.3
-  sembast: ^3.4.1+1
 
 dev_dependencies:
   import_sorter: ^4.6.0

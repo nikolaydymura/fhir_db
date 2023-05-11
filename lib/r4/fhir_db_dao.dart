@@ -3,28 +3,28 @@ import 'dart:async';
 
 import 'package:fhir/r4.dart';
 
-import 'hive_db.dart';
+import 'fhir_db.dart';
 
-class HiveDao {
+class FhirDbDao {
   /// Private Constructor
-  HiveDao._() {
-    _fhirDb = HiveDb();
+  FhirDbDao._() {
+    _fhirDb = FhirDb();
   }
 
   /// Singleton Accessor
-  HiveDb get fhirDb => _fhirDb;
+  FhirDb get fhirDb => _fhirDb;
 
   /// The actual database
-  late HiveDb _fhirDb;
+  late FhirDb _fhirDb;
 
   /// Singleton Instance
-  static final HiveDao _fhirHiveDao = HiveDao._();
+  static final FhirDbDao _fhirFhirDbDao = FhirDbDao._();
 
   /// Singleton factory
-  factory HiveDao() => _fhirHiveDao;
+  factory FhirDbDao() => _fhirFhirDbDao;
 
   /// Initalizes the database, configure its path, and return it
-  Future<HiveDb> init(String path) async {
+  Future<FhirDb> init(String path) async {
     await _fhirDb.initDb(path);
     return _fhirDb;
   }
@@ -46,6 +46,34 @@ class HiveDao {
     } else {
       throw const FormatException('Resource to save cannot be null');
     }
+  }
+
+  /// This version of save is only designed to be used to bulk upload an amount
+  /// of data/resources that haven't been uploaded yet. Unlike normal saving,
+  /// this method does not check if the resource is already in the database,
+  /// and will therefore overwrite it if it is
+  Future<bool> bulkSave(String? password, List<Resource> resources) async {
+    final resourceMap =
+        <R4ResourceType, Set<Map<String, Map<String, dynamic>>>>{};
+
+    resources.forEach((resource) {
+      if (resource.resourceType != null) {
+        if (!resourceMap.keys.contains(resource.resourceType)) {
+          resourceMap[resource.resourceType!] = {};
+        }
+        if (resource.id == null) {
+          final newResource = resource.newId();
+          resourceMap[resource.resourceType!]!
+              .add(<String, Map<String, dynamic>>{
+            newResource.id!: newResource.toJson()
+          });
+        } else {
+          resourceMap[resource.resourceType!]!.add(
+              <String, Map<String, dynamic>>{resource.id!: resource.toJson()});
+        }
+      }
+    });
+    return _fhirDb.bulkSave(resourceMap);
   }
 
   /// function used to save a new resource in the db
@@ -80,6 +108,13 @@ class HiveDao {
     } else {
       throw const FormatException('Resource passed must have a resourceType');
     }
+  }
+
+  /// function used to save a new resource in the db
+  Future<Resource?> get(
+      String? password, R4ResourceType resourceType, String id) async {
+    final resourceMap = await _fhirDb.get(resourceType, id);
+    return resourceMap == null ? null : Resource.fromJson(resourceMap);
   }
 
   /// searches for a specific [Resource]. That resource can be defined by
@@ -130,7 +165,7 @@ class HiveDao {
   }
 
   /// returns all resources of a specific type
-  Future<List<Resource>> getAllResourcesByType(
+  Future<List<Resource>> getActiveResourcesOfType(
     String? password, {
     List<R4ResourceType>? resourceTypes,
     List<String>? resourceTypeStrings,
@@ -212,7 +247,7 @@ class HiveDao {
       _fhirDb.deleteAllData(password);
 
   /// remove the resourceType from the list of types stored in the db
-  Future<bool> removeResourceTypes(
+  Future<bool> _removeResourceType(
     String? password,
     List<R4ResourceType> types,
   ) async {
@@ -233,4 +268,33 @@ class HiveDao {
       (await _fhirDb.search(resourceType, finder))
           .map((e) => Resource.fromJson(e))
           .toList();
+
+  /// ************************************************************************
+  /// All of the above has been for FHIR resources and data, below is if you
+  /// need to store whatever else as well
+  /// ************************************************************************
+  Future<int> saveGeneral(
+    String? password,
+    Object object,
+    int? key,
+  ) async =>
+      _fhirDb.saveGeneral(password, object, key);
+
+  Future<Object?> readGeneral({String? password, required int key}) async =>
+      _fhirDb.readGeneral(key);
+
+  Future<Iterable<Object>> getAllGeneral({String? password}) async =>
+      _fhirDb.getAllGeneral();
+
+  /// Delete specific entry
+  Future deleteFromGeneral(String password, int key) async =>
+      _fhirDb.deletefromGeneral(password, key);
+
+  /// Deletes everything stored in the general store
+  Future deleteAllGeneral(String? password) async =>
+      _fhirDb.clearGeneral(password);
+
+  /// Find specific entry
+  // Future findGeneral(String? password, String key) async =>
+  //     await _fhirDb.record(key).get(await _db(password));
 }

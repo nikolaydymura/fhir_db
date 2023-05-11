@@ -1,14 +1,13 @@
 # FHIR_DB
 
-This is the newest iteration of this package. I've started to look into using Dart and a small, lightweight database on the server side, and this prompted some updates. These included adding and adjusting some of the databases that are included. Here's the rundown:
+This is the newest iteration of this package. I've started to look into using Dart and a small, lightweight database on the server side, and this prompted a number of updates. The biggest is that I think I'm going to change this over to Hive. It seems to be faster and works in pure dart. If you don't like the changes or really want me to keep some of the old stuf, feel free to email me <grey@fhirfli.dev> or [join our slack](https://join.slack.com/t/fhir-fli/shared_invite/zt-1uwatxujq-A6zfK3aTTkiNoQFVjUD0Fw)
 
-1. [Sembast_SQFLite](https://pub.dev/packages/sembast_sqflite). Still the standard, I think especially if you're going to work with extremely large quantities of data (and need to store it locally on a mobile device), this is still probably your best bet. Also, still want to keep kudos to [Alex Tekartik](https://www.tekartik.com/) for all of his continued work maintaining all of these. I highly recommend that if you have any questions about working with this package that you take a look at [Sembast](https://pub.dev/packages/sembast). He's also just a super nice guy, and even answered a question for me when I was deciding which [sembast version](https://github.com/tekartik/sembast.dart/issues/183) to use.
-2. [Sembast](https://pub.dev/packages/sembast) - really the same as the above (follow the link above to see what the difference are). In this case, Sembast can be run in pure Dart, no Flutter necessary.
-3. [Hive](https://pub.dev/packages/hive) - Hive has been around a while, but I've finally started looking into it because it's what the [Atsign Folks](https://github.com/atsign-foundation) use as their backend database. So far I like it, and it is really, really fast.
+## [Changes](https://www.youtube.com/watch?v=xg3J5slvB-k)
+
+1. [Hive](https://pub.dev/packages/hive) - Hive has been around a while, but I've finally started looking into it because it's what the [Atsign Folks](https://github.com/atsign-foundation) use as their backend database. So far I like it, and it is really, really fast. I've tried uploading ~1GB of FHIR resources (totals about a million) and it takes about 20 seconds.
+2. [Sembast_SQFLite](https://pub.dev/packages/sembast_sqflite). Old school, but it doesn't handle the same volume that Hive does (at least not as efficiently), and it requires Flutter. Still want to give kudos to [Alex Tekartik](https://www.tekartik.com/) for all of his continued work maintaining all of these. I highly recommend that if you have any questions about working with this package that you take a look at [Sembast](https://pub.dev/packages/sembast). He's also just a super nice guy, and even answered a question for me when I was deciding which [sembast version](https://github.com/tekartik/sembast.dart/issues/183) to use.
 4. Others - Unfortunately I've tried [Isar](https://pub.dev/packages/isar) and [ObjectBox](https://pub.dev/packages/objectbox), and neither of them work particularly well with [Freezed](https://pub.dev/packages/freezed), and the FHIR structure is complicated enough that they have issues with it.
 5. [ServerPod](https://pub.dev/packages/serverpod) - I really want to like this, and I'm still hopeful. I'm having issues with serialization, but if they get fixed, I might include it here.
-
-I'm likely going to keep to branches for this repo. One will be for Flutter (so will include the first 3 above), and one will be for dart, which will include Sembast, Hive, and Serverpod (I hope). As always, if you like one of the others that's available and want to try to get it to work, that would be great.
 
 ## Functionality and methods needed
 
