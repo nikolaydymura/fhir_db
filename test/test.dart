@@ -13,24 +13,26 @@ Future<void> main() async {
   final Directory dir = Directory('assets');
   final List<String> fileList =
       await dir.list().map((FileSystemEntity event) => event.path).toList();
-  final DateTime startTime = DateTime.now();
-  int total = 0;
+  for (int i = 0; i < 4; i++) {
+    final DateTime startTime = DateTime.now();
+    int total = 0;
 
-  for (final String file in fileList) {
-    int i = 0;
-    final List<Resource?> resources = await FhirBulk.fromFile(file);
-    for (final Resource? resource in resources) {
-      if (resource != null) {
-        i++;
-        await hiveDao.save(null, resource);
+    for (final String file in fileList) {
+      int i = 0;
+      final List<Resource?> resources = await FhirBulk.fromFile(file);
+      for (final Resource? resource in resources) {
+        if (resource != null) {
+          i++;
+          await hiveDao.save(null, resource);
+        }
       }
+      output += '$i ${resources.first?.resourceTypeString}s\n';
+      total += i;
     }
-    output += '$i ${resources.first?.resourceTypeString}s\n';
-    total += i;
+    final DateTime endTime = DateTime.now();
+    final Duration duration = endTime.difference(startTime);
+    output += 'Total Resources: $total\n';
+    output += 'Total time: ${duration.inSeconds} seconds\n';
   }
-  final DateTime endTime = DateTime.now();
-  final Duration duration = endTime.difference(startTime);
-  output += 'Total Resources: $total\n';
-  output += 'Total time: ${duration.inSeconds} seconds\n';
   print(output);
 }

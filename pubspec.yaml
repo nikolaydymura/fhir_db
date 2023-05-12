@@ -11,9 +11,9 @@ dependencies:
   collection: ^1.17.0
   # fhir: ^0.9.5
   fhir:
-    path: ../fhir/fhir
+    path: ../fhir
   fhir_bulk:
-    path: ../fhir/fhir_bulk
+    path: ../fhir_bulk
   hive: ^2.2.3
   path: ^1.8.3
 
