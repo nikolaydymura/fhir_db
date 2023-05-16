@@ -9,11 +9,12 @@ environment:
 
 dependencies:
   collection: ^1.17.0
-  # fhir: ^0.9.5
-  fhir:
-    path: ../fhir
-  fhir_bulk:
-    path: ../fhir_bulk
+  fhir: ^0.10.0
+  # fhir:
+  #   path: ../fhir
+  fhir_bulk: ^0.10.0
+  # fhir_bulk:
+  #   path: ../fhir_bulk
   hive: ^2.2.3
   path: ^1.8.3
 
