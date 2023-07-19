@@ -7,6 +7,7 @@ import 'package:fhir/r4.dart';
 import 'package:hive/hive.dart';
 
 import 'fhir_db.dart';
+import 'utils.dart';
 
 class FhirDbDao {
   /// Singleton factory
@@ -27,18 +28,22 @@ class FhirDbDao {
   static final FhirDbDao _fhirFhirDbDao = FhirDbDao._();
 
   /// Initalizes the database, configure its path, and return it
-  Future<FhirDb> init({String? path, HiveCipher? cipher}) async {
-    await _fhirDb.initDb(path: path, cipher: cipher);
+  Future<FhirDb> init(String? pw, String? path) async {
+    await _fhirDb.initDb(path: path, cipher: cipherFromKey(key: pw));
     return _fhirDb;
   }
+
+  Future<void> updatePw(String? oldPw, String? newPw) async =>
+      _fhirDb.updatePw(oldPw, newPw);
 
   /// Saves a [Resource] to the local Db, [cipher] is optional (but after set,
   /// it must always be used everytime), will update the FhirFhirFhirMeta fields
   /// of the [Resource] and adds an id if none is already given.
-  Future<Resource> save({
+  Future<Resource> save(
+    String? pw,
     Resource? resource,
-    HiveCipher? cipher,
-  }) async {
+  ) async {
+    final HiveCipher? cipher = cipherFromKey(key: pw);
     if (resource != null) {
       if (resource.resourceType != null) {
         return resource.fhirId == null
@@ -61,13 +66,13 @@ class FhirDbDao {
   /// The built-in bulkSave (called addAll) for Hive only allows automatically
   /// generated, incremented (int) IDs, so this function really just calls the
   /// save function over and over
-  Future<bool> saveAll({
-    required List<Resource> resources,
-    HiveCipher? cipher,
-  }) async {
+  Future<bool> saveAll(
+    String? pw,
+    List<Resource> resources,
+  ) async {
     for (final Resource resource in resources) {
       try {
-        await save(resource: resource, cipher: cipher);
+        await save(pw, resource);
       } catch (e) {
         return false;
       }
@@ -75,11 +80,8 @@ class FhirDbDao {
     return true;
   }
 
-  Future<bool> addAll({
-    required List<Resource> resources,
-    HiveCipher? cipher,
-  }) async =>
-      saveAll(resources: resources, cipher: cipher);
+  Future<bool> addAll(String? pw, List<Resource> resources) async =>
+      saveAll(pw, resources);
 
   /// function used to save a new resource in the db
   Future<Resource> _insert({
@@ -136,15 +138,15 @@ class FhirDbDao {
   }
 
   /// function used to save a new resource in the db
-  Future<Resource?> get({
-    required R4ResourceType resourceType,
-    required String id,
-    HiveCipher? cipher,
-  }) async {
+  Future<Resource?> get(
+    String? pw,
+    R4ResourceType resourceType,
+    String id,
+  ) async {
     final Map<String, dynamic>? resourceMap = await _fhirDb.get(
       resourceType: resourceType,
       id: id,
-      cipher: cipher,
+      cipher: cipherFromKey(key: pw),
     );
     return resourceMap == null ? null : Resource.fromJson(resourceMap);
   }
@@ -160,14 +162,16 @@ class FhirDbDao {
   /// newValue = newValue['given'];
   /// newValue = newValue[2];
   ///
-  Future<List<Resource>> find({
+  Future<List<Resource>> find(
+    String? pw, {
     Resource? resource,
     R4ResourceType? resourceType,
     String? id,
     List<Object>? field,
     String? value,
-    HiveCipher? cipher,
   }) async {
+    final HiveCipher? cipher = cipherFromKey(key: pw);
+
     /// if we're just trying to match a resource
     if (resource != null &&
         resource.resourceType != null &&
@@ -303,11 +307,11 @@ class FhirDbDao {
     return false;
   }
 
-  Future<bool> clear([HiveCipher? cipher]) async => deleteAllResources(cipher);
+  Future<bool> clear(String? pw) async => deleteAllResources(pw);
 
   /// Deletes all resources, including historical versions
-  Future<bool> deleteAllResources([HiveCipher? cipher]) async =>
-      _fhirDb.deleteAllData(cipher);
+  Future<bool> deleteAllResources(String? pw) async =>
+      _fhirDb.deleteAllData(cipherFromKey(key: pw));
 
   /// ultimate search function, must pass in finder
   Future<List<Resource>> _search({

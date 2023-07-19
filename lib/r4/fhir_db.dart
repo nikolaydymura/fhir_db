@@ -5,11 +5,91 @@ import 'dart:developer';
 
 import 'package:collection/collection.dart';
 import 'package:fhir/r4/resource/resource.dart';
+import 'package:fhir_bulk/r4.dart';
 import 'package:hive/hive.dart';
+
+import 'utils.dart';
 
 class FhirDb {
   bool initialized = false;
   Set<R4ResourceType> _types = <R4ResourceType>{};
+
+  Future<void> updatePw(String? oldPw, String? newPw) async {
+    /// only both to change things if the new password doesn't equal the old password
+    if (oldPw != newPw) {
+      final HiveCipher? oldCipher = cipherFromKey(key: oldPw);
+      final HiveCipher? newCipher = cipherFromKey(key: newPw);
+      await _ensureInit(cipher: oldCipher);
+
+      /// The types box contains only a single entry, which is a list of all of the
+      /// resource types that have been saved to the database
+      final Box<List<String>> typesBox = await Hive.openBox<List<String>>(
+          'types',
+          encryptionCipher: oldCipher);
+
+      /// get that list of types
+      final List<String> types = typesBox.get('types') ?? <String>[];
+
+      /// Create a new temporary box to store resources while we are updating the boxes
+      /// with a new password
+      final Box<Map<String, dynamic>> tempBox =
+          await Hive.openBox<Map<String, dynamic>>('temp',
+              encryptionCipher: newCipher);
+
+      /// for each type in the list
+      for (final String type in types) {
+        /// Retrieve all resources currently in the box
+        final Box<Map<String, dynamic>> oldBox =
+            await Hive.openBox<Map<String, dynamic>>(type,
+                encryptionCipher: oldCipher);
+
+        /// for each map in the box
+        for (final Map<String, dynamic> value in oldBox.values) {
+          /// convert it to a resource
+          final Resource resource = Resource.fromJson(value);
+
+          /// Save it in the temporary box as we're changing over to the new password, so
+          /// in case something goes wrong, we don't lose the data
+          await tempBox.put(
+              '${resource.resourceType}/${resource.fhirId}', value);
+        }
+
+        /// after we have saved all of the resources in the temporary box, we can
+        /// delete the old box
+        await oldBox.deleteFromDisk();
+
+        /// Create the new box with the new password
+        final Box<Map<String, dynamic>> newBox =
+            await Hive.openBox<Map<String, dynamic>>(type,
+                encryptionCipher: newCipher);
+
+        /// for each map in the temp box
+        for (final Map<String, dynamic> value in tempBox.values) {
+          /// convert it to a resource
+          final Resource resource = Resource.fromJson(value);
+
+          /// Save it to the new box with the new password
+          await newBox.put(
+              '${resource.resourceType}/${resource.fhirId}', value);
+        }
+
+        /// clear everything from the tempBox so we can use it again
+        await tempBox.clear();
+      }
+
+      /// After we've been through all of the types, delete the tempBox.
+      await tempBox.deleteFromDisk();
+
+      /// Delete the typesBox because we need to replace it too using the new password
+      await typesBox.deleteFromDisk();
+
+      /// Recreate the types box
+      final Box<List<String>> newTypesBox = await Hive.openBox<List<String>>(
+          'types',
+          encryptionCipher: newCipher);
+      await newTypesBox.put('types', types);
+    }
+  }
 
   /// To initialize the database as a whole. Configure the path, set initialized
   /// to true, register all of the ResourceTypeAdapters, and then assign the
@@ -68,6 +148,7 @@ class FhirDb {
             _types
                 .map((R4ResourceType e) => Resource.resourceTypeToString(e))
                 .toList());
+        final List<String>? boxes = box.get('types');
         return true;
       }
     } catch (e) {
@@ -137,8 +218,15 @@ class FhirDb {
       resourceType: resourceType,
       cipher: cipher,
     );
+    try{
     final Map<String, dynamic>? resourceMap = box.get(id);
+    print(resourceMap.runtimeType);
     return resourceMap;
+    }catch(e,s){
+      print(e);
+      print(s);
+      return null;
+    }
   }
 
   Future<Iterable<Map<String, dynamic>>> getActiveResourcesOfType(

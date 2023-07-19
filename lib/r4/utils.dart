@@ -2,14 +2,22 @@ import 'dart:convert';
 
 import 'package:hive/hive.dart';
 
-/// Generates a new secure key from a string (password) you pass in, otherwise,
-/// generates a completely new one that you will need to store
-List<int> generateSecureKey({String? key}) =>
-    key != null ? base64Url.decode(key) : Hive.generateSecureKey();
+const String nonRandomSalt = '±¾³½÷×¼ƒ¢ª¤®£°¥º';
 
 /// Generates the cipher directly from a key (password)
-HiveAesCipher cipherFromKey(String key) =>
-    cipherFromSecureKey(base64Url.decode(key));
-
-/// Accepts a List<int> as input and provides the HiveAesCipher (256 bit)
-HiveAesCipher cipherFromSecureKey(List<int> key) => HiveAesCipher(key);
+HiveAesCipher? cipherFromKey({String? key}) {
+  if (key == null) {
+    return null;
+  } else {
+    List<int> encoded = utf8.encode(key);
+    if (encoded.length == 32) {
+      return HiveAesCipher(encoded);
+    } else if (encoded.length > 32) {
+      return HiveAesCipher(encoded.sublist(0, 32));
+    } else {
+      encoded = encoded +
+          utf8.encode(nonRandomSalt).sublist(0, 32 - encoded.length);
+      return HiveAesCipher(encoded);
+    }
+  }
+}
