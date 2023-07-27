@@ -2,6 +2,8 @@ import 'dart:convert';
 
 import 'package:hive/hive.dart';
 
+export 'package:hive/hive.dart' show HiveCipher;
+
 const String nonRandomSalt = '±¾³½÷×¼ƒ¢ª¤®£°¥º';
 
 /// Generates the cipher directly from a key (password)
