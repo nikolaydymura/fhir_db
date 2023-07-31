@@ -1,6 +1,7 @@
 // ignore_for_file: avoid_dynamic_calls
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:developer';
 
 import 'package:collection/collection.dart';
@@ -116,7 +117,7 @@ class FhirDb {
   }
 
   /// This is to get a specific Box
-  Future<Box<Map<String, dynamic>>> _getBox(
+  Future<Box<Map<dynamic, dynamic>>> _getBox(
       {required R4ResourceType resourceType, HiveCipher? cipher}) async {
     await _ensureInit(cipher: cipher);
     final String resourceTypeString =
@@ -163,7 +164,7 @@ class FhirDb {
   }) async {
     try {
       await _ensureInit(cipher: cipher);
-      final Box<Map<String, dynamic>> box =
+      final box =
           await _getBox(resourceType: resourceType, cipher: cipher);
       await box.put(resource['id'], resource);
       return await _addType(resourceType: resourceType, cipher: cipher);
@@ -202,7 +203,7 @@ class FhirDb {
       return false;
     } else {
       await _ensureInit(cipher: cipher);
-      final Box<Map<String, dynamic>> box =
+      final  box =
           await _getBox(resourceType: resourceType, cipher: cipher);
       return box.containsKey(id);
     }
@@ -213,28 +214,28 @@ class FhirDb {
     required String id,
     HiveCipher? cipher,
   }) async {
+    Map<String, dynamic>? result = null;
     await _ensureInit(cipher: cipher);
-    final Box<Map<String, dynamic>> box = await _getBox(
-      resourceType: resourceType,
-      cipher: cipher,
-    );
+    final box = await _getBox(resourceType: resourceType, cipher: cipher);
     try{
-    final Map<String, dynamic>? resourceMap = box.get(id);
-    print(resourceMap.runtimeType);
-    return resourceMap;
+      final resourceMap = await box.get(id);
+      if (resourceMap != null) {
+        result = jsonDecode(jsonEncode(resourceMap));
+      }
     }catch(e,s){
       print(e);
       print(s);
-      return null;
     }
+
+    return result;
   }
 
   Future<Iterable<Map<String, dynamic>>> getActiveResourcesOfType(
       {required R4ResourceType resourceType, HiveCipher? cipher}) async {
     await _ensureInit(cipher: cipher);
-    final Box<Map<String, dynamic>> box =
+    final box =
         await _getBox(resourceType: resourceType, cipher: cipher);
-    return box.values;
+    return box.values.map((e) => Map<String, dynamic>.from(e));
   }
 
   Future<List<Map<String, dynamic>>> getAllActiveResources(
@@ -254,7 +255,7 @@ class FhirDb {
   }) async {
     try {
       await _ensureInit(cipher: cipher);
-      final Box<Map<String, dynamic>> box = await _getBox(
+      final box = await _getBox(
         resourceType: resourceType,
         cipher: cipher,
       );
@@ -272,11 +273,11 @@ class FhirDb {
   }) async {
     try {
       await _ensureInit(cipher: cipher);
-      final Box<Map<String, dynamic>> box =
+      final box =
           await _getBox(resourceType: resourceType, cipher: cipher);
       final String? resourceId = box.values
           .firstWhereOrNull(
-              (Map<String, dynamic> element) => finder(element))?['id']
+              (Map<dynamic, dynamic> element) => finder(Map<String, dynamic>.from(element)))?['id']
           ?.toString();
       if (resourceId != null) {
         await box.delete(resourceId);
@@ -291,7 +292,7 @@ class FhirDb {
       {required R4ResourceType resourceType, HiveCipher? cipher}) async {
     try {
       await _ensureInit(cipher: cipher);
-      final Box<Map<String, dynamic>> box = await _getBox(
+      final box = await _getBox(
         resourceType: resourceType,
         cipher: cipher,
       );
@@ -306,7 +307,7 @@ class FhirDb {
     try {
       await _ensureInit(cipher: cipher);
       for (final R4ResourceType type in _types) {
-        final Box<Map<String, dynamic>> box =
+        final box =
             await _getBox(resourceType: type, cipher: cipher);
         await box.deleteFromDisk();
       }
@@ -329,12 +330,12 @@ class FhirDb {
     if (!initialized) {
       await initDb(cipher: cipher);
     }
-    final Box<Map<String, dynamic>> box =
+    final box =
         await _getBox(resourceType: resourceType, cipher: cipher);
-    final Map<dynamic, Map<String, dynamic>> boxData = box.toMap();
+    final Map<dynamic, Map<dynamic, dynamic>> boxData = box.toMap();
     boxData.removeWhere(
-        (dynamic key, Map<String, dynamic> value) => !finder(value));
-    return boxData.values;
+        (dynamic key, Map<dynamic, dynamic> value) => !finder(Map<String, dynamic>.from(value)));
+    return boxData.values.map((e) => jsonDecode(jsonEncode(e)));
   }
 
   /// ************************************************************************
