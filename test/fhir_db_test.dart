@@ -19,20 +19,20 @@ Future<void> main() async {
   final FhirDbDao fhirDbDao = FhirDbDao();
   const String password1 = 'password1';
   const String password2 = 'password2';
-  await fhirDbDao.init(password1, directory);
+  await fhirDbDao.init(directory, pw: password1);
   const Patient patient1 = Patient(fhirId: '1');
-  final Resource saved1 = await fhirDbDao.save(password1, patient1);
+  final Resource saved1 = await fhirDbDao.save(patient1, pw: password1);
   group('', () {
     test('Saved A Patient, Found A Patient', () async {
-      final List<Resource> search1 = await fhirDbDao.find(password1,
-          resourceType: R4ResourceType.Patient, id: '1');
+      final List<Resource> search1 = await fhirDbDao.find(
+          resourceType: R4ResourceType.Patient, id: '1', pw: password1);
       expect(saved1, search1[0]);
     });
 
     test('Found Patient With New Password Because Box Was Already Opened',
         () async {
-      final List<Resource> search2 = await fhirDbDao.find(password1,
-          resourceType: R4ResourceType.Patient, id: '1');
+      final List<Resource> search2 = await fhirDbDao.find(
+          resourceType: R4ResourceType.Patient, id: '1', pw: password1);
       expect(saved1, search2[0]);
     });
 
@@ -42,8 +42,8 @@ Future<void> main() async {
       //     resourceType: R4ResourceType.Patient, id: '1');
       // expect(true, search3.isEmpty);
       // await fhirDbDao.closeAllBoxes();
-      final List<Resource> search4 = await fhirDbDao.find(password2,
-          resourceType: R4ResourceType.Patient, id: '1');
+      final List<Resource> search4 = await fhirDbDao.find(
+          resourceType: R4ResourceType.Patient, id: '1', pw: password2);
       expect(saved1, search4[0]);
       await fhirDbDao.updatePw(password2, null);
     });
@@ -55,7 +55,7 @@ Future<void> main() async {
       const HumanName humanName =
           HumanName(family: 'Atreides', given: <String>['Duke']);
       const Patient patient = Patient(fhirId: id, name: <HumanName>[humanName]);
-      final Resource saved = await fhirDbDao.save(null, patient);
+      final Resource saved = await fhirDbDao.save(patient);
 
       expect(saved.fhirId, id);
       expect((saved as Patient).name?[0], humanName);
@@ -64,7 +64,7 @@ Future<void> main() async {
     test('Save Organization', () async {
       const Organization organization =
           Organization(fhirId: id, name: 'FhirFli');
-      final Resource saved = await fhirDbDao.save(null, organization);
+      final Resource saved = await fhirDbDao.save(organization);
 
       expect(saved.fhirId, id);
 
@@ -77,7 +77,7 @@ Future<void> main() async {
         code: const CodeableConcept(text: 'Observation #1'),
         effectiveDateTime: FhirDateTime(DateTime(1981, 09, 18)),
       );
-      final Resource saved = await fhirDbDao.save(null, observation1);
+      final Resource saved = await fhirDbDao.save(observation1);
 
       expect(saved.fhirId, 'obs1');
 
@@ -88,7 +88,7 @@ Future<void> main() async {
       const Observation observation1 = Observation(
           fhirId: 'obs1',
           code: CodeableConcept(text: 'Observation #1 - Updated'));
-      final Resource saved = await fhirDbDao.save(null, observation1);
+      final Resource saved = await fhirDbDao.save(observation1);
 
       expect(saved.fhirId, 'obs1');
 
@@ -103,7 +103,7 @@ Future<void> main() async {
         code: const CodeableConcept(text: 'Observation #2'),
         effectiveDateTime: FhirDateTime(DateTime(1981, 09, 18)),
       );
-      final Resource saved = await fhirDbDao.save(null, observation2);
+      final Resource saved = await fhirDbDao.save(observation2);
 
       expect(saved.fhirId, 'obs2');
 
@@ -116,7 +116,7 @@ Future<void> main() async {
         code: const CodeableConcept(text: 'Observation #3'),
         effectiveDateTime: FhirDateTime(DateTime(1981, 09, 18)),
       );
-      final Resource saved = await fhirDbDao.save(null, observation3);
+      final Resource saved = await fhirDbDao.save(observation3);
 
       expect(saved.fhirId, 'obs3');
 
@@ -126,8 +126,8 @@ Future<void> main() async {
 
   group('Finding Things:', () {
     test('Find 1st Patient', () async {
-      final List<Resource> search = await fhirDbDao.find(null,
-          resourceType: R4ResourceType.Patient, id: id);
+      final List<Resource> search =
+          await fhirDbDao.find(resourceType: R4ResourceType.Patient, id: id);
       const HumanName humanName =
           HumanName(family: 'Atreides', given: <String>['Duke']);
 
@@ -137,7 +137,7 @@ Future<void> main() async {
     });
 
     test('Find 3rd Observation', () async {
-      final List<Resource> search = await fhirDbDao.find(null,
+      final List<Resource> search = await fhirDbDao.find(
           resourceType: R4ResourceType.Observation, id: 'obs3');
 
       expect(search.length, 1);
@@ -149,7 +149,6 @@ Future<void> main() async {
 
     test('Find All Observations', () async {
       final List<Resource> search = await fhirDbDao.getActiveResourcesOfType(
-        null,
         resourceTypes: <R4ResourceType>[R4ResourceType.Observation],
       );
 
@@ -197,7 +196,6 @@ Future<void> main() async {
       );
 
       final List<Resource> search = await fhirDbDao.getActiveResourcesOfType(
-        null,
         resourceTypes: <R4ResourceType>[R4ResourceType.Observation],
       );
 
@@ -234,7 +232,7 @@ Future<void> main() async {
     });
 
     test('Delete All Resources', () async {
-      await fhirDbDao.deleteAllResources(null);
+      await fhirDbDao.deleteAllResources();
 
       final List<Resource> search = await fhirDbDao.getAllActiveResources(null);
 
@@ -248,7 +246,7 @@ Future<void> main() async {
       const HumanName humanName =
           HumanName(family: 'Atreides', given: <String>['Duke']);
       const Patient patient = Patient(fhirId: id, name: <HumanName>[humanName]);
-      final Resource saved = await fhirDbDao.save(password2, patient);
+      final Resource saved = await fhirDbDao.save(patient, pw: password2);
 
       expect(saved.fhirId, id);
 
@@ -258,7 +256,7 @@ Future<void> main() async {
     test('Save Organization', () async {
       const Organization organization =
           Organization(fhirId: id, name: 'FhirFli');
-      final Resource saved = await fhirDbDao.save(password2, organization);
+      final Resource saved = await fhirDbDao.save(organization, pw: password2);
 
       expect(saved.fhirId, id);
 
@@ -271,7 +269,7 @@ Future<void> main() async {
         code: const CodeableConcept(text: 'Observation #1'),
         effectiveDateTime: FhirDateTime(DateTime(1981, 09, 18)),
       );
-      final Resource saved = await fhirDbDao.save(password2, observation1);
+      final Resource saved = await fhirDbDao.save(observation1, pw: password2);
 
       expect(saved.fhirId, 'obs1');
 
@@ -282,7 +280,7 @@ Future<void> main() async {
       const Observation observation1 = Observation(
           fhirId: 'obs1',
           code: CodeableConcept(text: 'Observation #1 - Updated'));
-      final Resource saved = await fhirDbDao.save(password2, observation1);
+      final Resource saved = await fhirDbDao.save(observation1, pw: password2);
 
       expect(saved.fhirId, 'obs1');
 
@@ -297,7 +295,7 @@ Future<void> main() async {
         code: const CodeableConcept(text: 'Observation #2'),
         effectiveDateTime: FhirDateTime(DateTime(1981, 09, 18)),
       );
-      final Resource saved = await fhirDbDao.save(password2, observation2);
+      final Resource saved = await fhirDbDao.save(observation2, pw: password2);
 
       expect(saved.fhirId, 'obs2');
 
@@ -310,7 +308,7 @@ Future<void> main() async {
         code: const CodeableConcept(text: 'Observation #3'),
         effectiveDateTime: FhirDateTime(DateTime(1981, 09, 18)),
       );
-      final Resource saved = await fhirDbDao.save(password2, observation3);
+      final Resource saved = await fhirDbDao.save(observation3, pw: password2);
 
       expect(saved.fhirId, 'obs3');
 
@@ -320,8 +318,8 @@ Future<void> main() async {
 
   group('Password - Finding Things:', () {
     test('Find 1st Patient', () async {
-      final List<Resource> search = await fhirDbDao.find(password2,
-          resourceType: R4ResourceType.Patient, id: id);
+      final List<Resource> search = await fhirDbDao.find(
+          resourceType: R4ResourceType.Patient, id: id, pw: password2);
       const HumanName humanName =
           HumanName(family: 'Atreides', given: <String>['Duke']);
 
@@ -331,8 +329,8 @@ Future<void> main() async {
     });
 
     test('Find 3rd Observation', () async {
-      final List<Resource> search = await fhirDbDao.find(password2,
-          resourceType: R4ResourceType.Observation, id: 'obs3');
+      final List<Resource> search = await fhirDbDao.find(
+          resourceType: R4ResourceType.Observation, id: 'obs3', pw: password2);
 
       expect(search.length, 1);
 
@@ -343,9 +341,8 @@ Future<void> main() async {
 
     test('Find All Observations', () async {
       final List<Resource> search = await fhirDbDao.getActiveResourcesOfType(
-        password2,
-        resourceTypes: <R4ResourceType>[R4ResourceType.Observation],
-      );
+          resourceTypes: <R4ResourceType>[R4ResourceType.Observation],
+          pw: password2);
 
       expect(search.length, 3);
 
@@ -390,9 +387,8 @@ Future<void> main() async {
           resourceType: R4ResourceType.Observation, id: 'obs2');
 
       final List<Resource> search = await fhirDbDao.getActiveResourcesOfType(
-        password2,
-        resourceTypes: <R4ResourceType>[R4ResourceType.Observation],
-      );
+          resourceTypes: <R4ResourceType>[R4ResourceType.Observation],
+          pw: password2);
 
       expect(search.length, 2);
 
@@ -430,7 +426,7 @@ Future<void> main() async {
     });
 
     test('Delete All Resources', () async {
-      await fhirDbDao.deleteAllResources(password2);
+      await fhirDbDao.deleteAllResources(pw: password2);
 
       final List<Resource> search =
           await fhirDbDao.getAllActiveResources(password2);
@@ -458,7 +454,7 @@ Future<void> main() async {
           for (final Resource? resource in resources) {
             if (resource != null) {
               i++;
-              await fhirDbDao.save(null, resource);
+              await fhirDbDao.save(resource);
             }
           }
           total += i;
@@ -468,27 +464,33 @@ Future<void> main() async {
         output += 'Total Resources: $total\n';
         output += 'Total time: ${duration.inSeconds} seconds';
       }
-      await fhirDbDao.save(null, testPatient1);
-      await fhirDbDao.save(null, testPatient2);
-      await fhirDbDao.save(null, testObservation1);
-      await fhirDbDao.save(null, testObservation2);
-      await fhirDbDao.save(null, testObservation3);
-      await fhirDbDao.save(null, testObservation4);
-      await fhirDbDao.save(null, testObservation5);
-      await fhirDbDao.save(null, testObservation6);
-      await fhirDbDao.save(null, testConceptMap1);
-      await fhirDbDao.save(null, testCondition1);
+      await fhirDbDao.save(testPatient1);
+      await fhirDbDao.save(testPatient2);
+      await fhirDbDao.save(testObservation1);
+      await fhirDbDao.save(testObservation2);
+      await fhirDbDao.save(testObservation3);
+      await fhirDbDao.save(testObservation4);
+      await fhirDbDao.save(testObservation5);
+      await fhirDbDao.save(testObservation6);
+      await fhirDbDao.save(testConceptMap1);
+      await fhirDbDao.save(testCondition1);
 
       print(output);
       final DateTime testStartTime = DateTime.now();
       expect(true, await compareTwoResources(testPatient1, fhirDbDao, null));
       expect(true, await compareTwoResources(testPatient2, fhirDbDao, null));
-      expect(true, await compareTwoResources(testObservation1, fhirDbDao, null));
-      expect(true, await compareTwoResources(testObservation2, fhirDbDao, null));
-      expect(true, await compareTwoResources(testObservation3, fhirDbDao, null));
-      expect(true, await compareTwoResources(testObservation4, fhirDbDao, null));
-      expect(true, await compareTwoResources(testObservation5, fhirDbDao, null));
-      expect(true, await compareTwoResources(testObservation6, fhirDbDao, null));
+      expect(
+          true, await compareTwoResources(testObservation1, fhirDbDao, null));
+      expect(
+          true, await compareTwoResources(testObservation2, fhirDbDao, null));
+      expect(
+          true, await compareTwoResources(testObservation3, fhirDbDao, null));
+      expect(
+          true, await compareTwoResources(testObservation4, fhirDbDao, null));
+      expect(
+          true, await compareTwoResources(testObservation5, fhirDbDao, null));
+      expect(
+          true, await compareTwoResources(testObservation6, fhirDbDao, null));
       expect(true, await compareTwoResources(testConceptMap1, fhirDbDao, null));
       expect(true, await compareTwoResources(testCondition1, fhirDbDao, null));
       final DateTime testEndTime = DateTime.now();
@@ -502,7 +504,7 @@ Future<void> main() async {
 Future<bool> compareTwoResources(
     Resource originalResource, FhirDbDao fhirDbDao, String? pw) async {
   final Resource? dbResource = await fhirDbDao.get(
-      pw, originalResource.resourceType!, originalResource.fhirId!);
+      pw: pw, resourceType: originalResource.resourceType!, id: originalResource.fhirId!);
   final Map<String, dynamic> resource1Json = originalResource.toJson();
   final Map<String, dynamic>? resource2json = dbResource?.toJson();
   resource1Json.remove('meta');
