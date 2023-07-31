@@ -14,11 +14,10 @@ class FhirDb {
   bool initialized = false;
   Set<R4ResourceType> _types = <R4ResourceType>{};
 
-  Future<void> updatePw(String? oldPw, String? newPw) async {
+  Future<void> updateCipher(HiveCipher? oldCipher, HiveCipher? newCipher) async {
     /// only both to change things if the new password doesn't equal the old password
-    if (oldPw != newPw) {
-      final HiveCipher? oldCipher = cipherFromKey(key: oldPw);
-      final HiveCipher? newCipher = cipherFromKey(key: newPw);
+    if (oldCipher != newCipher) {
+
       await _ensureInit(cipher: oldCipher);
 
       /// The types box contains only a single entry, which is a list of all of the
@@ -97,6 +96,13 @@ class FhirDb {
       await Hive.close();
     }
   }
+
+  Future<void> updatePw(String? oldPw, String? newPw)async{
+    if(oldPw != newPw){
+      final HiveCipher? oldCipher = cipherFromKey(key: oldPw);
+      final HiveCipher? newCipher = cipherFromKey(key: newPw);
+      await updateCipher(oldCipher, newCipher);
+  }}
 
   /// To initialize the database as a whole. Configure the path, set initialized
   /// to true, register all of the ResourceTypeAdapters, and then assign the
@@ -222,7 +228,7 @@ class FhirDb {
     await _ensureInit(cipher: cipher);
     final Box<Map<dynamic, dynamic>> box = await _getBox(
       resourceType: resourceType,
-      cipher: cipher,
+      cipher: cipher
     );
     try {
       final Map<dynamic, dynamic>? resourceMap = box.get(id);
@@ -234,8 +240,8 @@ class FhirDb {
       print(e);
       print(s);
       return <String, dynamic>{};
-    }
-  }
+
+  }}
 
   Future<Iterable<Map<String, dynamic>>> getActiveResourcesOfType(
       {required R4ResourceType resourceType, HiveCipher? cipher}) async {

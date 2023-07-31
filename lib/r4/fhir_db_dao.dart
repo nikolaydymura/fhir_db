@@ -4,7 +4,6 @@
 import 'dart:async';
 
 import 'package:fhir/r4.dart';
-import 'package:hive/hive.dart';
 
 import 'fhir_db.dart';
 import 'utils.dart';
@@ -28,10 +27,14 @@ class FhirDbDao {
   static final FhirDbDao _fhirFhirDbDao = FhirDbDao._();
 
   /// Initalizes the database, configure its path, and return it
-  Future<FhirDb> init(String? pw, String? path, [HiveCipher? cipher]) async {
+  Future<FhirDb> init(String? path, {HiveCipher? cipher, String? pw}) async {
     await _fhirDb.initDb(path: path, cipher: cipher ?? cipherFromKey(key: pw));
     return _fhirDb;
   }
+
+  Future<void> updateCipher(
+          HiveCipher? oldCipher, HiveCipher? newCipher) async =>
+      _fhirDb.updateCipher(oldCipher, newCipher);
 
   Future<void> updatePw(String? oldPw, String? newPw) async =>
       _fhirDb.updatePw(oldPw, newPw);
@@ -40,40 +43,39 @@ class FhirDbDao {
   /// it must always be used everytime), will update the FhirFhirFhirMeta fields
   /// of the [Resource] and adds an id if none is already given.
   Future<Resource> save(
-    String? pw,
-    Resource? resource, [
+    Resource? resource, {
     HiveCipher? cipher,
-  ]) async {
+    String? pw,
+  }) async {
     cipher ??= cipherFromKey(key: pw);
     if (resource != null) {
       if (resource.resourceType != null) {
         return resource.fhirId == null
-            ? await _insert(resource: resource, cipher: cipher)
+            ? await _insert(resource, cipher)
             : await fhirDb.exists(
                 resourceType: resource.resourceType!,
                 id: resource.fhirId!,
                 cipher: cipher,
               )
-                ? await _update(resource: resource, cipher: cipher)
-                : await _insert(resource: resource, cipher: cipher);
+                ? await _update(resource, cipher)
+                : await _insert(resource, cipher);
       } else {
         throw const FormatException('ResourceType cannot be null');
       }
     } else {
-      throw const FormatException('Resource to save cannot be null');
+      throw const FormatException('Resource cannot be null');
     }
   }
 
   /// The built-in bulkSave (called addAll) for Hive only allows automatically
   /// generated, incremented (int) IDs, so this function really just calls the
   /// save function over and over
-  Future<bool> saveAll(
-    String? pw,
-    List<Resource> resources,
-  ) async {
+  Future<bool> saveAll(List<Resource> resources,
+      {HiveCipher? cipher, String? pw}) async {
+    cipher ??= cipherFromKey(key: pw);
     for (final Resource resource in resources) {
       try {
-        await save(pw, resource);
+        await save(resource, cipher: cipher);
       } catch (e) {
         return false;
       }
@@ -81,14 +83,15 @@ class FhirDbDao {
     return true;
   }
 
-  Future<bool> addAll(String? pw, List<Resource> resources) async =>
-      saveAll(pw, resources);
+  Future<bool> addAll(List<Resource> resources,
+          {HiveCipher? cipher, String? pw}) async =>
+      saveAll(resources, cipher: cipher ?? cipherFromKey(key: pw));
 
   /// function used to save a new resource in the db
-  Future<Resource> _insert({
-    required Resource resource,
+  Future<Resource> _insert(
+    Resource resource,
     HiveCipher? cipher,
-  }) async {
+  ) async {
     final Resource newResource =
         resource.newIdIfNoId().updateVersion(oldMeta: resource.meta);
     await _fhirDb.save(
@@ -101,10 +104,10 @@ class FhirDbDao {
 
   /// functions used to update a resource which has already been saved into the
   /// db, will also save the old version
-  Future<Resource> _update({
-    required Resource resource,
+  Future<Resource> _update(
+    Resource resource,
     HiveCipher? cipher,
-  }) async {
+  ) async {
     if (resource.resourceTypeString != null) {
       if (resource.fhirId != null) {
         final Map<String, dynamic> dbResource = await _fhirDb.get(
@@ -130,10 +133,10 @@ class FhirDbDao {
           );
           return newResource;
         } else {
-          return _insert(resource: resource, cipher: cipher);
+          return _insert(resource, cipher);
         }
       } else {
-        return _insert(resource: resource, cipher: cipher);
+        return _insert(resource, cipher);
       }
     } else {
       throw const FormatException('Resource passed must have a resourceType');
@@ -141,16 +144,18 @@ class FhirDbDao {
   }
 
   /// function used to save a new resource in the db
-  Future<Resource?> get(
-    String? pw,
-    R4ResourceType resourceType,
-    String id, [
+  Future<Resource?> get({
+    required R4ResourceType resourceType,
+    required String id,
     HiveCipher? cipher,
-  ]) async {
+    String? pw,
+  }) async {
+    cipher ??= cipherFromKey(key: pw);
+
     final Map<String, dynamic> resourceMap = await _fhirDb.get(
       resourceType: resourceType,
       id: id,
-      cipher: cipher ?? cipherFromKey(key: pw),
+      cipher: cipher,
     );
     return resourceMap.isEmpty
         ? null
@@ -167,15 +172,14 @@ class FhirDbDao {
   /// newValue = resource['name'];
   /// newValue = newValue['given'];
   /// newValue = newValue[2];
-  ///
-  Future<List<Resource>> find(
-    String? pw, {
-    HiveCipher? cipher,
+  Future<List<Resource>> find({
     Resource? resource,
     R4ResourceType? resourceType,
     String? id,
     List<Object>? field,
     String? value,
+    HiveCipher? cipher,
+    String? pw,
   }) async {
     cipher ??= cipherFromKey(key: pw);
 
@@ -213,7 +217,8 @@ class FhirDbDao {
         return result.toString() == value;
       }
 
-      return _search(resourceType: resourceType, finder: finder);
+      return _search(
+          resourceType: resourceType, finder: finder, cipher: cipher);
     } else {
       throw const FormatException('Must have either: '
           '\n1) a resource with a resourceType'
@@ -223,12 +228,12 @@ class FhirDbDao {
   }
 
   /// returns all resources of a specific type
-  Future<List<Resource>> getActiveResourcesOfType(
-    String? pw, {
+  Future<List<Resource>> getActiveResourcesOfType({
     List<R4ResourceType>? resourceTypes,
     List<String>? resourceTypeStrings,
     Resource? resource,
     HiveCipher? cipher,
+    String? pw,
   }) async {
     cipher ??= cipherFromKey(key: pw);
     final Set<R4ResourceType> typeList = <R4ResourceType>{};
@@ -269,12 +274,12 @@ class FhirDbDao {
 
   /// Delete specific resource
   Future<bool> delete({
-    String? pw,
     Resource? resource,
     R4ResourceType? resourceType,
     String? id,
     bool Function(Map<String, dynamic>)? finder,
     HiveCipher? cipher,
+    String? pw,
   }) async {
     cipher ??= cipherFromKey(key: pw);
     if (resource != null &&
@@ -309,10 +314,10 @@ class FhirDbDao {
   /// that type - Note: will NOT delete any _historical stores (must pass in
   /// _history as the type for this to happen)
   Future<bool> deleteSingleType({
-    String? pw,
     R4ResourceType? resourceType,
     Resource? resource,
     HiveCipher? cipher,
+    String? pw,
   }) async {
     cipher ??= cipherFromKey(key: pw);
     if (resourceType != null || resource?.resourceType != null) {
@@ -325,10 +330,11 @@ class FhirDbDao {
     return false;
   }
 
-  Future<bool> clear(String? pw) async => deleteAllResources(pw);
+  Future<bool> clear({HiveCipher? cipher, String? pw}) async =>
+      deleteAllResources(cipher: cipher ?? cipherFromKey(key: pw));
 
   /// Deletes all resources, including historical versions
-  Future<bool> deleteAllResources(String? pw, [HiveCipher? cipher]) async =>
+  Future<bool> deleteAllResources({HiveCipher? cipher, String? pw}) async =>
       _fhirDb.deleteAllData(cipher ?? cipherFromKey(key: pw));
 
   /// ultimate search function, must pass in finder
@@ -353,50 +359,54 @@ class FhirDbDao {
     required Object object,
     int? key,
     HiveCipher? cipher,
+    String? pw,
   }) async =>
       _fhirDb.saveGeneral(
         object: object,
         key: key,
-        cipher: cipher,
+        cipher: cipher ?? cipherFromKey(key: pw),
       );
 
   Future<Object?> readGeneral({
     required int key,
     HiveCipher? cipher,
+    String? pw,
   }) async =>
       _fhirDb.readGeneral(
         key: key,
-        cipher: cipher,
+        cipher: cipher ?? cipherFromKey(key: pw),
       );
 
-  Future<Iterable<Object>> getAllGeneral([HiveCipher? cipher]) async =>
+  Future<Iterable<Object>> getAllGeneral({HiveCipher? cipher, String? pw}) async =>
       _fhirDb.getAllGeneral();
 
   Future<Iterable<Object>> searchGeneral({
     required bool Function(Object) finder,
     HiveCipher? cipher,
+    String? pw,
   }) async =>
       _fhirDb.searchGeneral(
         finder: finder,
-        cipher: cipher,
+        cipher: cipher ?? cipherFromKey(key: pw),
       );
 
   /// Delete specific entry
   Future<bool> deleteFromGeneral({
     required int key,
     HiveCipher? cipher,
+    String? pw,
   }) async =>
       _fhirDb.deletefromGeneral(
         key: key,
-        cipher: cipher,
+        cipher: cipher ?? cipherFromKey(key: pw),
       );
 
-  Future<bool> clearGeneral([HiveCipher? cipher]) =>
-      _fhirDb.clearGeneral(cipher);
+  Future<bool> clearGeneral({HiveCipher? cipher, String? pw}) =>
+      _fhirDb.clearGeneral(cipher ?? cipherFromKey(key: pw));
 
   /// Deletes everything stored in the general store
-  Future<bool> deleteAllGeneral([HiveCipher? cipher]) async =>
-      _fhirDb.clearGeneral(cipher);
+  Future<bool> deleteAllGeneral({HiveCipher? cipher, String? pw}) async =>
+      _fhirDb.clearGeneral(cipher ?? cipherFromKey(key: pw));
 
   /// ************************************************************************
   /// These methods are for closing boxes, usually not needed and mostly for
@@ -406,18 +416,18 @@ class FhirDbDao {
 
   /// Specify a list of which boxes you want to close
   Future<void> closeResourceBoxes(List<R4ResourceType> types,
-          [HiveCipher? cipher]) async =>
-      _fhirDb.closeResourceBoxes(types, cipher);
+          {HiveCipher? cipher, String? pw}) async =>
+      _fhirDb.closeResourceBoxes(types, cipher ?? cipherFromKey(key: pw));
 
   /// Close the general box
-  Future<void> closeHistoryBox([HiveCipher? cipher]) async =>
-      _fhirDb.closeHistoryBox(cipher);
+  Future<void> closeHistoryBox({HiveCipher? cipher, String? pw}) async =>
+      _fhirDb.closeHistoryBox(cipher ?? cipherFromKey(key: pw));
 
   /// Close the general box
-  Future<void> closeGeneralBox([HiveCipher? cipher]) async =>
-      _fhirDb.closeGeneralBox(cipher);
+  Future<void> closeGeneralBox({HiveCipher? cipher, String? pw}) async =>
+      _fhirDb.closeGeneralBox(cipher ?? cipherFromKey(key: pw));
 
   /// Close the types box
-  Future<void> closeTypesBox([HiveCipher? cipher]) async =>
-      _fhirDb.closeTypesBox(cipher);
+  Future<void> closeTypesBox({HiveCipher? cipher, String? pw}) async =>
+  _fhirDb.closeTypesBox(cipher ?? cipherFromKey(key: pw));
 }
