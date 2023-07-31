@@ -2,7 +2,7 @@
 
 import 'package:fhir/r4.dart';
 
-final condition1 = Condition.fromJson({
+final testCondition1 = Condition.fromJson({
   "resourceType": "Condition",
   "id": "ae71070a-1f52-5755-b598-ae0effba2772",
   "meta": {
@@ -39,7 +39,7 @@ final condition1 = Condition.fromJson({
   "subject": {"reference": "Patient/1cf9e585-806c-513b-80af-4ca565a28231"},
   "encounter": {"reference": "Encounter/a604549e-5294-536d-b3c0-41f1652cd5af"}
 });
-final conceptMap1 = ConceptMap.fromJson({
+final testConceptMap1 = ConceptMap.fromJson({
   "resourceType": "ConceptMap",
   "id": "sc-episode-of-care-status",
   "text": {
@@ -117,7 +117,7 @@ final conceptMap1 = ConceptMap.fromJson({
     }
   ]
 });
-final patient1 = Patient.fromJson({
+final testPatient1 = Patient.fromJson({
   "resourceType": "Patient",
   "id": "a2605b15-4f1b-5839-b4ce-fb7a6bc1005f",
   "meta": {
@@ -199,8 +199,7 @@ final patient1 = Patient.fromJson({
     "reference": "Organization/ee172322-118b-5716-abbc-18e4c5437e15"
   }
 });
-
-final patient2 = Patient.fromJson({
+final testPatient2 = Patient.fromJson({
   "resourceType": "Patient",
   "id": "a3a12d01-dc21-565b-89e2-da60e7fc80dc",
   "meta": {
@@ -281,8 +280,7 @@ final patient2 = Patient.fromJson({
     "reference": "Organization/ee172322-118b-5716-abbc-18e4c5437e15"
   }
 });
-
-final observation1 = Observation.fromJson({
+final testObservation1 = Observation.fromJson({
   "resourceType": "Observation",
   "id": "70cedbd3-2ea1-5c02-b6a1-eb9af4a675a1",
   "meta": {
@@ -338,7 +336,7 @@ final observation1 = Observation.fromJson({
     {"reference": "Observation/954d7003-acf6-51ad-8190-4b089e2aaa08"}
   ]
 });
-final observation2 = Observation.fromJson({
+final testObservation2 = Observation.fromJson({
   "resourceType": "Observation",
   "id": "717897cb-fbc3-5cc2-be49-5cd15c91cda0",
   "meta": {
@@ -383,7 +381,7 @@ final observation2 = Observation.fromJson({
     {"reference": "Observation/552a87fe-93b2-5c3a-a05e-4a02a69993f2"}
   ]
 });
-final observation3 = Observation.fromJson({
+final testObservation3 = Observation.fromJson({
   "resourceType": "Observation",
   "id": "fb255ddc-d6ae-59d2-918b-b8570d9fb6b0",
   "meta": {
@@ -426,7 +424,7 @@ final observation3 = Observation.fromJson({
   "valueString": "NO GROWTH.  ",
   "specimen": {"reference": "Specimen/5aa7bded-4749-519d-b4e6-29f3c26e32e2"}
 });
-final observation4 = Observation.fromJson({
+final testObservation4 = Observation.fromJson({
   "resourceType": "Observation",
   "id": "fb5815bf-5bd1-5a5e-b13c-3262adeb64b5",
   "meta": {
@@ -470,7 +468,7 @@ final observation4 = Observation.fromJson({
   "valueString": "NO GROWTH.  ",
   "specimen": {"reference": "Specimen/253e817f-1810-5002-9b44-ec52101894a0"}
 });
-final observation5 = Observation.fromJson({
+final testObservation5 = Observation.fromJson({
   "resourceType": "Observation",
   "id": "ef03f176-c48e-5495-9ffa-b77c59ec67f2",
   "meta": {
@@ -514,7 +512,7 @@ final observation5 = Observation.fromJson({
   "issued": "2156-05-19T03:56:00-04:00",
   "valueDateTime": "2156-05-16T14:00:00-04:00"
 });
-final observation6 = Observation.fromJson({
+final testObservation6 = Observation.fromJson({
   "resourceType": "Observation",
   "id": "ef0771a2-ad06-5e14-bbd6-c9e271ab4b0b",
   "meta": {

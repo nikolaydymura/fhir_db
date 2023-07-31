@@ -1,11 +1,11 @@
 // ignore_for_file: avoid_dynamic_calls
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:developer';
 
 import 'package:collection/collection.dart';
 import 'package:fhir/r4/resource/resource.dart';
-import 'package:fhir_bulk/r4.dart';
 import 'package:hive/hive.dart';
 
 import 'utils.dart';
@@ -32,26 +32,29 @@ class FhirDb {
 
       /// Create a new temporary box to store resources while we are updating the boxes
       /// with a new password
-      final Box<Map<String, dynamic>> tempBox =
-          await Hive.openBox<Map<String, dynamic>>('temp',
+      final Box<Map<dynamic, dynamic>> tempBox =
+          await Hive.openBox<Map<dynamic, dynamic>>('temp',
               encryptionCipher: newCipher);
 
       /// for each type in the list
       for (final String type in types) {
         /// Retrieve all resources currently in the box
-        final Box<Map<String, dynamic>> oldBox =
-            await Hive.openBox<Map<String, dynamic>>(type,
+        final Box<Map<dynamic, dynamic>> oldBox =
+            await Hive.openBox<Map<dynamic, dynamic>>(type,
                 encryptionCipher: oldCipher);
 
         /// for each map in the box
-        for (final Map<String, dynamic> value in oldBox.values) {
+        for (final Map<dynamic, dynamic> value in oldBox.values) {
+          /// Cast map to correct type
+          final Map<String, dynamic> newValue =
+              jsonDecode(jsonEncode(value)) as Map<String, dynamic>;
+
           /// convert it to a resource
-          final Resource resource = Resource.fromJson(value);
+          final Resource resource = Resource.fromJson(newValue);
 
           /// Save it in the temporary box as we're changing over to the new password, so
           /// in case something goes wrong, we don't lose the data
-          await tempBox.put(
-              '${resource.resourceType}/${resource.fhirId}', value);
+          await tempBox.put(resource.fhirId, newValue);
         }
 
         /// after we have saved all of the resources in the temporary box, we can
@@ -59,18 +62,21 @@ class FhirDb {
         await oldBox.deleteFromDisk();
 
         /// Create the new box with the new password
-        final Box<Map<String, dynamic>> newBox =
-            await Hive.openBox<Map<String, dynamic>>(type,
+        final Box<Map<dynamic, dynamic>> newBox =
+            await Hive.openBox<Map<dynamic, dynamic>>(type,
                 encryptionCipher: newCipher);
 
         /// for each map in the temp box
-        for (final Map<String, dynamic> value in tempBox.values) {
+        for (final Map<dynamic, dynamic> value in tempBox.values) {
+          /// Cast map to correct type
+          final Map<String, dynamic> newValue =
+              Map<String, dynamic>.from(value);
+
           /// convert it to a resource
-          final Resource resource = Resource.fromJson(value);
+          final Resource resource = Resource.fromJson(newValue);
 
           /// Save it to the new box with the new password
-          await newBox.put(
-              '${resource.resourceType}/${resource.fhirId}', value);
+          await newBox.put(resource.fhirId, newValue);
         }
 
         /// clear everything from the tempBox so we can use it again
@@ -88,6 +94,7 @@ class FhirDb {
           'types',
           encryptionCipher: newCipher);
       await newTypesBox.put('types', types);
+      await Hive.close();
     }
   }
 
@@ -116,7 +123,7 @@ class FhirDb {
   }
 
   /// This is to get a specific Box
-  Future<Box<Map<String, dynamic>>> _getBox(
+  Future<Box<Map<dynamic, dynamic>>> _getBox(
       {required R4ResourceType resourceType, HiveCipher? cipher}) async {
     await _ensureInit(cipher: cipher);
     final String resourceTypeString =
@@ -148,7 +155,6 @@ class FhirDb {
             _types
                 .map((R4ResourceType e) => Resource.resourceTypeToString(e))
                 .toList());
-        final List<String>? boxes = box.get('types');
         return true;
       }
     } catch (e) {
@@ -163,7 +169,7 @@ class FhirDb {
   }) async {
     try {
       await _ensureInit(cipher: cipher);
-      final Box<Map<String, dynamic>> box =
+      final Box<Map<dynamic, dynamic>> box =
           await _getBox(resourceType: resourceType, cipher: cipher);
       await box.put(resource['id'], resource);
       return await _addType(resourceType: resourceType, cipher: cipher);
@@ -177,7 +183,7 @@ class FhirDb {
       {required Map<String, dynamic> resource, HiveCipher? cipher}) async {
     try {
       await _ensureInit(cipher: cipher);
-      Box<Map<String, dynamic>> box;
+      Box<Map<dynamic, dynamic>> box;
       if (!Hive.isBoxOpen('history')) {
         box = await Hive.openBox('history', encryptionCipher: cipher);
       } else {
@@ -202,39 +208,44 @@ class FhirDb {
       return false;
     } else {
       await _ensureInit(cipher: cipher);
-      final Box<Map<String, dynamic>> box =
+      final Box<Map<dynamic, dynamic>> box =
           await _getBox(resourceType: resourceType, cipher: cipher);
       return box.containsKey(id);
     }
   }
 
-  Future<Map<String, dynamic>?> get({
+  Future<Map<String, dynamic>> get({
     required R4ResourceType resourceType,
     required String id,
     HiveCipher? cipher,
   }) async {
     await _ensureInit(cipher: cipher);
-    final Box<Map<String, dynamic>> box = await _getBox(
+    final Box<Map<dynamic, dynamic>> box = await _getBox(
       resourceType: resourceType,
       cipher: cipher,
     );
-    try{
-    final Map<String, dynamic>? resourceMap = box.get(id);
-    print(resourceMap.runtimeType);
-    return resourceMap;
-    }catch(e,s){
+    try {
+      final Map<dynamic, dynamic>? resourceMap = box.get(id);
+      final Map<String, dynamic> newResourceMap = resourceMap == null
+          ? <String, dynamic>{}
+          : jsonDecode(jsonEncode(resourceMap)) as Map<String, dynamic>;
+      return newResourceMap;
+    } catch (e, s) {
       print(e);
       print(s);
-      return null;
+      return <String, dynamic>{};
     }
   }
 
   Future<Iterable<Map<String, dynamic>>> getActiveResourcesOfType(
       {required R4ResourceType resourceType, HiveCipher? cipher}) async {
     await _ensureInit(cipher: cipher);
-    final Box<Map<String, dynamic>> box =
+    final Box<Map<dynamic, dynamic>> box =
         await _getBox(resourceType: resourceType, cipher: cipher);
-    return box.values;
+    return box.values
+        .map((Map<dynamic, dynamic> e) =>
+            jsonDecode(jsonEncode(e)) as Map<String, dynamic>)
+        .toList();
   }
 
   Future<List<Map<String, dynamic>>> getAllActiveResources(
@@ -254,7 +265,7 @@ class FhirDb {
   }) async {
     try {
       await _ensureInit(cipher: cipher);
-      final Box<Map<String, dynamic>> box = await _getBox(
+      final Box<Map<dynamic, dynamic>> box = await _getBox(
         resourceType: resourceType,
         cipher: cipher,
       );
@@ -272,11 +283,11 @@ class FhirDb {
   }) async {
     try {
       await _ensureInit(cipher: cipher);
-      final Box<Map<String, dynamic>> box =
+      final Box<Map<dynamic, dynamic>> box =
           await _getBox(resourceType: resourceType, cipher: cipher);
       final String? resourceId = box.values
-          .firstWhereOrNull(
-              (Map<String, dynamic> element) => finder(element))?['id']
+          .firstWhereOrNull((Map<dynamic, dynamic> element) =>
+              finder(Map<String, dynamic>.from(element)))?['id']
           ?.toString();
       if (resourceId != null) {
         await box.delete(resourceId);
@@ -291,7 +302,7 @@ class FhirDb {
       {required R4ResourceType resourceType, HiveCipher? cipher}) async {
     try {
       await _ensureInit(cipher: cipher);
-      final Box<Map<String, dynamic>> box = await _getBox(
+      final Box<Map<dynamic, dynamic>> box = await _getBox(
         resourceType: resourceType,
         cipher: cipher,
       );
@@ -306,7 +317,7 @@ class FhirDb {
     try {
       await _ensureInit(cipher: cipher);
       for (final R4ResourceType type in _types) {
-        final Box<Map<String, dynamic>> box =
+        final Box<Map<dynamic, dynamic>> box =
             await _getBox(resourceType: type, cipher: cipher);
         await box.deleteFromDisk();
       }
@@ -326,15 +337,16 @@ class FhirDb {
     required bool Function(Map<String, dynamic>) finder,
     HiveCipher? cipher,
   }) async {
-    if (!initialized) {
-      await initDb(cipher: cipher);
-    }
-    final Box<Map<String, dynamic>> box =
+    await _ensureInit(cipher: cipher);
+    final Box<Map<dynamic, dynamic>> box =
         await _getBox(resourceType: resourceType, cipher: cipher);
-    final Map<dynamic, Map<String, dynamic>> boxData = box.toMap();
-    boxData.removeWhere(
-        (dynamic key, Map<String, dynamic> value) => !finder(value));
-    return boxData.values;
+    final Map<dynamic, Map<dynamic, dynamic>> boxData = box.toMap();
+    boxData.removeWhere((dynamic key, Map<dynamic, dynamic> value) =>
+        !finder(Map<String, dynamic>.from(value)));
+    return box.values
+        .map((Map<dynamic, dynamic> e) =>
+            jsonDecode(jsonEncode(e)) as Map<String, dynamic>)
+        .toList();
   }
 
   /// ************************************************************************
@@ -344,6 +356,7 @@ class FhirDb {
 
   Future<int> saveGeneral(
       {required Object object, int? key, HiveCipher? cipher}) async {
+    await _ensureInit(cipher: cipher);
     try {
       final Box<Object> box;
       if (!Hive.isBoxOpen('general')) {
@@ -363,9 +376,7 @@ class FhirDb {
   }
 
   Future<Object?> readGeneral({required int key, HiveCipher? cipher}) async {
-    if (!initialized) {
-      await initDb(cipher: cipher);
-    }
+    await _ensureInit(cipher: cipher);
     final Box<Object> box;
     if (!Hive.isBoxOpen('general')) {
       box = await Hive.openBox('general', encryptionCipher: cipher);
@@ -376,9 +387,7 @@ class FhirDb {
   }
 
   Future<Iterable<Object>> getAllGeneral([HiveCipher? cipher]) async {
-    if (!initialized) {
-      await initDb(cipher: cipher);
-    }
+    await _ensureInit(cipher: cipher);
     final Box<Object> box;
     if (!Hive.isBoxOpen('general')) {
       box = await Hive.openBox('general', encryptionCipher: cipher);
@@ -393,9 +402,7 @@ class FhirDb {
     required bool Function(Object) finder,
     HiveCipher? cipher,
   }) async {
-    if (!initialized) {
-      await initDb(cipher: cipher);
-    }
+    await _ensureInit(cipher: cipher);
     final Box<Object> box;
     if (!Hive.isBoxOpen('general')) {
       box = await Hive.openBox('general', encryptionCipher: cipher);
@@ -408,6 +415,7 @@ class FhirDb {
   }
 
   Future<bool> deletefromGeneral({required int key, HiveCipher? cipher}) async {
+    await _ensureInit(cipher: cipher);
     try {
       final Box<Object> box;
       if (!Hive.isBoxOpen('general')) {
@@ -423,6 +431,7 @@ class FhirDb {
   }
 
   Future<bool> clearGeneral([HiveCipher? cipher]) async {
+    await _ensureInit(cipher: cipher);
     try {
       final Box<Object> box;
       if (!Hive.isBoxOpen('general')) {
@@ -434,6 +443,51 @@ class FhirDb {
       return true;
     } catch (e) {
       return false;
+    }
+  }
+
+  /// ************************************************************************
+  /// These methods are for closing boxes, usually not needed and mostly for
+  /// debugging purposes
+  /// ************************************************************************
+  Future<void> closeAllBoxes() async => Hive.close();
+
+  /// Specify a list of which boxes you want to close
+  Future<void> closeResourceBoxes(
+    List<R4ResourceType> types, [
+    HiveCipher? cipher,
+  ]) async {
+    await _ensureInit(cipher: cipher);
+    for (final R4ResourceType resourceType in types) {
+      final String resourceTypeString =
+          Resource.resourceTypeToString(resourceType);
+      if (!Hive.isBoxOpen(resourceTypeString)) {
+        await Hive.box(resourceTypeString).close();
+      }
+    }
+  }
+
+  /// Close the history box
+  Future<void> closeHistoryBox([HiveCipher? cipher]) async {
+    await _ensureInit(cipher: cipher);
+    if (Hive.isBoxOpen('history')) {
+      await Hive.box('history').close();
+    }
+  }
+
+  /// Close the general box
+  Future<void> closeGeneralBox([HiveCipher? cipher]) async {
+    await _ensureInit(cipher: cipher);
+    if (Hive.isBoxOpen('general')) {
+      await Hive.box('general').close();
+    }
+  }
+
+  /// Close the types box
+  Future<void> closeTypesBox([HiveCipher? cipher]) async {
+    await _ensureInit(cipher: cipher);
+    if (Hive.isBoxOpen('types')) {
+      await Hive.box('types').close();
     }
   }
 }

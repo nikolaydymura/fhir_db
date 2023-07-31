@@ -15,8 +15,8 @@ HiveAesCipher? cipherFromKey({String? key}) {
     } else if (encoded.length > 32) {
       return HiveAesCipher(encoded.sublist(0, 32));
     } else {
-      encoded = encoded +
-          utf8.encode(nonRandomSalt).sublist(0, 32 - encoded.length);
+      encoded =
+          encoded + utf8.encode(nonRandomSalt).sublist(0, 32 - encoded.length);
       return HiveAesCipher(encoded);
     }
   }

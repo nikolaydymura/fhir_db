@@ -1,15 +1,19 @@
 # FHIR_DB
 
-This is the newest iteration of this package. I've started to look into using Dart and a small, lightweight database on the server side, and this prompted a number of updates. The biggest is that I think I'm going to change this over to Hive. It seems to be faster and works in pure dart. If you don't like the changes or really want me to keep some of the old stuf, feel free to email me <grey@fhirfli.dev> or [join our slack](https://join.slack.com/t/fhir-fli/shared_invite/zt-1uwatxujq-A6zfK3aTTkiNoQFVjUD0Fw)
+This is the newest iteration of this package. I've started to look into using Dart and a small, lightweight database on the server side, and this prompted a number of updates. The biggest is that I think I'm going to change this over to Hive. It seems to be faster and works in pure dart. If you don't like the changes or really want me to keep some of the old stuf, feel free to email me <grey@fhirfli.dev> or [join our slack](https://join.slack.com/t/fhir-fli/shared_invite/zt-1uwatxujq-A6zfK3aTTkiNoQFVjUD0Fw) and let me know. I can bring it back, but if there's no big arguments, it's obviously easier to just maintain one version.
 
 ## [Changes](https://www.youtube.com/watch?v=xg3J5slvB-k)
 
-1. [Hive](https://pub.dev/packages/hive) - Hive has been around a while, but I've finally started looking into it because it's what the [Atsign Folks](https://github.com/atsign-foundation) use as their backend database. So far I like it, and it is really, really fast. I've tried uploading ~1GB of FHIR resources (totals about a million) and it takes about 20 seconds.
-2. [Sembast_SQFLite](https://pub.dev/packages/sembast_sqflite). Old school, but it doesn't handle the same volume that Hive does (at least not as efficiently), and it requires Flutter. Still want to give kudos to [Alex Tekartik](https://www.tekartik.com/) for all of his continued work maintaining all of these. I highly recommend that if you have any questions about working with this package that you take a look at [Sembast](https://pub.dev/packages/sembast). He's also just a super nice guy, and even answered a question for me when I was deciding which [sembast version](https://github.com/tekartik/sembast.dart/issues/183) to use.
-4. Others - Unfortunately I've tried [Isar](https://pub.dev/packages/isar) and [ObjectBox](https://pub.dev/packages/objectbox), and neither of them work particularly well with [Freezed](https://pub.dev/packages/freezed), and the FHIR structure is complicated enough that they have issues with it.
-5. [ServerPod](https://pub.dev/packages/serverpod) - I really want to like this, and I'm still hopeful. I'm having issues with serialization, but if they get fixed, I might include it here.
+[Hive](https://pub.dev/packages/hive) - Hive has been around a while, but I've finally started looking into it because it's what the [Atsign Folks](https://github.com/atsign-foundation) use as their backend database. So far I like it, and it is really, really fast. I've tried uploading ~1GB of FHIR resources (totals about a million) and it takes about 20 seconds.
 
-## Functionality and methods needed
+Other Considerations
+
+1. [Sembast_SQFLite](https://pub.dev/packages/sembast_sqflite) - Old school, but it doesn't handle the same volume that Hive does (at least not as quickly), and it requires Flutter. Still want to give kudos to [Alex Tekartik](https://www.tekartik.com/) for all of his continued work maintaining all of these. I highly recommend that if you have any questions about working with this package that you take a look at [Sembast](https://pub.dev/packages/sembast). He's also just a super nice guy, and even answered a question for me when I was deciding which [sembast version](https://github.com/tekartik/sembast.dart/issues/183) to use.
+2. [Isar](https://pub.dev/packages/isar) - is the newest database from the creator of Hive. However, it requires everything to have an integer ID (which tbh is part of the reason I added a dbId entry for Resources), but it doesn't handle maps very well. And I couldn't ever get it work the way I wanted to. Could still be an option for the future.
+3. [ObjectBox](https://pub.dev/packages/objectbox) - another db that a lot of people use and like, and is supposed to be fast. However, it doesn't seem to work very well with [Freezed](https://pub.dev/packages/freezed), and the FHIR structure is complicated enough that they have issues with it.
+4. [ServerPod](https://pub.dev/packages/serverpod) - so not an option for local db, but possibly if you're trying to run a lightweight server/database on your own. However, still a little too cumbersome for me to feel like it was worthwhile at this point.
+
+## Functionality and methods needed - this is everything I want this package to be able to do
 
 1. Create
     - Add new Resource
@@ -42,6 +46,10 @@ This is the newest iteration of this package. I've started to look into using Da
     - Everything
 
 ## Using the Db
+
+### 2 idiosnycrasies to be aware of surrounding encryption
+
+1. Passwords and ciphers. Hive uses a 256-bit AES Cipher for encryption. This can be generated from a password, and I've included a function that does just this. However, it's important to always pass in the same password/cipher. If you open a box with the wrong password, you won't get any data, but you may mess up the box, even when you try and use it later with the correct password. I'm working on ways to fix this, but it may involve storing the cipher using flutter_secure_storage so we're always sure we pass the correct one in. 
 
 So, while not absolutely necessary, I highly recommend that you use some sort of interface class. This adds the benefit of more easily handling errors, plus if you change to a different database in the future, you don't have to change the rest of your app, just the interface.
 
