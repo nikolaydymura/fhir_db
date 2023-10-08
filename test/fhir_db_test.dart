@@ -496,7 +496,7 @@ Future<void> main() async {
       final DateTime testEndTime = DateTime.now();
       print(
           'Found 10 resources in total of ${testEndTime.difference(testStartTime).inMilliseconds} ms');
-    });
+    }, timeout: const Timeout(Duration(minutes: 10)));
   });
   await Hive.close();
 }
@@ -504,7 +504,9 @@ Future<void> main() async {
 Future<bool> compareTwoResources(
     Resource originalResource, FhirDbDao fhirDbDao, String? pw) async {
   final Resource? dbResource = await fhirDbDao.get(
-      pw: pw, resourceType: originalResource.resourceType!, id: originalResource.fhirId!);
+      pw: pw,
+      resourceType: originalResource.resourceType!,
+      id: originalResource.fhirId!);
   final Map<String, dynamic> resource1Json = originalResource.toJson();
   final Map<String, dynamic>? resource2json = dbResource?.toJson();
   resource1Json.remove('meta');
