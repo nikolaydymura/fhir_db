@@ -9,7 +9,7 @@ import 'package:fhir_db/r4/fhir_db_dao.dart';
 import 'package:hive/hive.dart';
 import 'package:test/test.dart';
 
-import 'test_resources.dart';
+import '../test/test_resources.dart';
 
 Future<void> main() async {
   const String directory = 'db';

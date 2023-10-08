@@ -377,7 +377,8 @@ class FhirDbDao {
         cipher: cipher ?? cipherFromKey(key: pw),
       );
 
-  Future<Iterable<Object>> getAllGeneral({HiveCipher? cipher, String? pw}) async =>
+  Future<Iterable<Object>> getAllGeneral(
+          {HiveCipher? cipher, String? pw}) async =>
       _fhirDb.getAllGeneral();
 
   Future<Iterable<Object>> searchGeneral({
@@ -429,5 +430,5 @@ class FhirDbDao {
 
   /// Close the types box
   Future<void> closeTypesBox({HiveCipher? cipher, String? pw}) async =>
-  _fhirDb.closeTypesBox(cipher ?? cipherFromKey(key: pw));
+      _fhirDb.closeTypesBox(cipher ?? cipherFromKey(key: pw));
 }
