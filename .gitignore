@@ -28,3 +28,6 @@ doc/api/
 
 *test/assets*
 *test/db*
+
+*db/*
+*assets/*

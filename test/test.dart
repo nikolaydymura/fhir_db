@@ -19,14 +19,6 @@ Future<void> main() async {
 
   /// Initialize Hive & Clear Current Hive DB
   final FhirDb fhirDb = FhirDb();
-  fhirDb
-      .listen(resourceType: R4ResourceType.Observation)
-      .map((Resource? resource) {
-    print('inside listen function');
-    if (resource != null) {
-      print(resource.path);
-    }
-  });
   const String password1 = 'password1';
   const String password2 = 'password2';
   await fhirDb.init(path: directory, pw: password1);
@@ -463,7 +455,11 @@ Future<void> main() async {
         for (final String file in fileList) {
           // print(file);
           int i = 0;
-          final List<Resource> resources = await FhirBulk.fromFile(file);
+
+          final List<Resource> resources = file.contains('ndjson')
+              ? await FhirBulk.fromFile(file)
+              : <Resource>[];
+
           for (final Resource? resource in resources) {
             if (resource != null) {
               i++;

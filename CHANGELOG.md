@@ -1,5 +1,10 @@
 # fhir_db
 
+## [0.11.0-4]
+
+* Updated Dependencies
+* Simplifed the number files (merged FhirDbDao and FhirDb - I think most people want to make their own interface classes)
+
 ## [0.11.0-3]
 
 * Trying to score more pub points
