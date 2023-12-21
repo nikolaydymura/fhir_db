@@ -651,7 +651,7 @@ class FhirDb {
     final Map<dynamic, Map<dynamic, dynamic>> boxData = box.toMap();
     boxData.removeWhere((dynamic key, Map<dynamic, dynamic> value) =>
         !finder(Map<String, dynamic>.from(value)));
-    return box.values
+    return boxData.values
         .map((Map<dynamic, dynamic> e) =>
             jsonDecode(jsonEncode(e)) as Map<String, dynamic>)
         .map((Map<String, dynamic> e) => Resource.fromJson(e))
