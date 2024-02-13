@@ -361,7 +361,7 @@ class FhirDb {
     }
   }
 
-  Stream<Resource> listen({
+  Stream<Resource?> listen({
     required R5ResourceType resourceType,
     String? id,
     String? pw,
@@ -371,17 +371,21 @@ class FhirDb {
         await _getBox(resourceType: resourceType, pw: pw);
 
     if (id == null) {
-      yield* box.watch().asyncExpand((BoxEvent event) async* {
+      yield* box.watch().map((BoxEvent event) {
         if (!event.deleted) {
-          yield Resource.fromJson(
+          return Resource.fromJson(
               jsonDecode(jsonEncode(event.value)) as Map<String, dynamic>);
+        } else {
+          return null;
         }
       });
     } else {
-      yield* box.watch(key: id).asyncExpand((BoxEvent event) async* {
+      yield* box.watch(key: id).map((BoxEvent event) {
         if (!event.deleted) {
-          yield Resource.fromJson(
+          return Resource.fromJson(
               jsonDecode(jsonEncode(event.value)) as Map<String, dynamic>);
+        } else {
+          return null;
         }
       });
     }

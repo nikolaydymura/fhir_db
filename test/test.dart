@@ -1,5 +1,6 @@
 // ignore_for_file: avoid_print
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:collection/collection.dart';
@@ -446,6 +447,22 @@ Future<void> main() async {
     test('(& Resources)', () async {
       String output = '';
       final Directory dir = Directory('assets');
+      final StreamSubscription<Resource?> subscription =
+          fhirDb.listen(resourceType: R4ResourceType.Observation).listen(
+        (Resource? resource) {
+          // This block is where you handle each emitted item
+          print('Received resource: ${resource?.path}');
+        },
+        onError: (error) {
+          // Handle any errors
+          print('Error: $error');
+        },
+        onDone: () {
+          // Handle stream completion
+          print('Stream completed.');
+        },
+      );
+
       final List<String> fileList =
           await dir.list().map((FileSystemEntity event) => event.path).toList();
       int total = 0;
@@ -473,6 +490,7 @@ Future<void> main() async {
         output += 'Total Resources: $total\n';
         output += 'Total time: ${duration.inSeconds} seconds';
       }
+
       await fhirDb.save(resource: testPatient1);
       await fhirDb.save(resource: testPatient2);
       await fhirDb.save(resource: testObservation1);
@@ -499,6 +517,7 @@ Future<void> main() async {
       final DateTime testEndTime = DateTime.now();
       print(
           'Found 10 resources in total of ${testEndTime.difference(testStartTime).inMilliseconds} ms');
+      await subscription.cancel();
     }, timeout: const Timeout(Duration(minutes: 10)));
   });
   await Hive.close();
