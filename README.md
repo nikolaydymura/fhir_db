@@ -106,11 +106,11 @@ final patient = Patient(
 );
 
 final saveResult = await IFhirDb().save(patient);
+```
 
-```dart
 This will save your newly created patient to the locally embedded database.   
 
-*IMPORTANT*: this database will expect that all previously created resources have an id. When you save a resource, it will check to see if that resource type has already been stored. (Each resource type is saved in it's own store in the database). It will then check if there is an ID. If there's no ID, it will create a new one for that resource (along with metadata on version number and creation time). It will save it, and return the resource. If it already has an ID, it will copy the the old version of the resource into a ```_history``` store. It will then update the metadata of the new resource and save that version into the appropriate store for that resource. If, for instance, we have a previously created patient:
+*IMPORTANT*: this database will expect that all previously created resources have an id. When you save a resource, it will check to see if that resource type has already been stored. (Each resource type is saved in its own store in the database). It will then check if there is an ID. If there is no ID, it will create a new one for that resource (along with metadata on version number and creation time). It will save it, and return the resource. If it already has an ID, it will copy the the old version of the resource into a ```_history``` store. It will then update the metadata of the new resource and save that version into the appropriate store for that resource. If, for instance, we have a previously created patient:
 
 ```dart
 {
@@ -192,6 +192,7 @@ class IFhirDb {
     }
     return right(Unit);
   }
+}
 ```
 
 You don't have to use a password, and in that case, it will save the db file as plain text. If you want to add a password later, it will encrypt it at that time.
