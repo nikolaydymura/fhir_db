@@ -1,5 +1,10 @@
 # fhir_db
 
+## [0.12.0]
+ 
+* Updated dependencies
+* Listen now works
+
 ## [0.11.0-dev5]
 * fixed search (Thanks to the PR from [nikolaydymura](https://github.com/nikolaydymura))
 
