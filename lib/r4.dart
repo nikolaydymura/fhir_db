@@ -211,18 +211,19 @@ class FhirDb {
   Future<Resource> save({
     Resource? resource,
     String? pw,
+    bool saveHistory = true,
   }) async {
     if (resource != null) {
       if (resource.resourceType != null) {
-        return resource.fhirId == null
-            ? await _insert(resource, pw)
-            : await exists(
-                resourceType: resource.resourceType!,
-                id: resource.fhirId!,
-                pw: pw,
-              )
-                ? await _update(resource, pw)
-                : await _insert(resource, pw);
+        if (resource.fhirId == null) {
+          return _insert(resource, pw);
+        }
+        final Resource? oldResource = await get(
+          resourceType: resource.resourceType!,
+          id: resource.fhirId!,
+          pw: pw,
+        );
+        return _upsert(resource, pw, saveHistory: saveHistory, oldResource: oldResource);
       } else {
         throw const FormatException('ResourceType cannot be null');
       }
@@ -237,10 +238,11 @@ class FhirDb {
   Future<bool> saveAll({
     required List<Resource> resources,
     String? pw,
+    bool saveHistory = true,
   }) async {
     for (final Resource resource in resources) {
       try {
-        await save(resource: resource, pw: pw);
+        await save(resource: resource, pw: pw, saveHistory: saveHistory);
       } catch (e) {
         return false;
       }
@@ -251,8 +253,9 @@ class FhirDb {
   Future<bool> addAll(
     List<Resource> resources, {
     String? pw,
+    bool saveHistory = true,
   }) async =>
-      saveAll(resources: resources, pw: pw);
+      saveAll(resources: resources, pw: pw, saveHistory: saveHistory);
 
   /// function used to save a new resource in the db
   Future<Resource> _insert(
@@ -271,22 +274,21 @@ class FhirDb {
 
   /// functions used to update a resource which has already been saved into the
   /// db, will also save the old version
-  Future<Resource> _update(
+  Future<Resource> _upsert(
     Resource resource,
-    String? pw,
-  ) async {
+    String? pw, {
+    bool saveHistory = true,
+    Resource? oldResource,
+  }) async {
     if (resource.resourceTypeString != null) {
       if (resource.fhirId != null) {
-        final Resource? oldResource = await get(
-          resourceType: resource.resourceType!,
-          id: resource.fhirId!,
-          pw: pw,
-        );
         if (oldResource != null) {
-          await _saveHistory(
-            resource: oldResource.toJson(),
-            pw: pw,
-          );
+          if (saveHistory) {
+            await _saveHistory(
+              resource: oldResource.toJson(),
+              pw: pw,
+            );
+          }
           final FhirMeta? oldMeta = oldResource.meta;
           final Resource newResource = resource.updateVersion(oldMeta: oldMeta);
           await _saveToDb(
