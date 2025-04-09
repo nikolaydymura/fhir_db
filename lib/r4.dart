@@ -325,8 +325,10 @@ class FhirDb {
   FutureOr<bool> _saveHistory({
     required Map<String, dynamic> resource,
     String? pw,
-  }) =>
-      historyRecorder.saveRecord(resource: resource, pw: pw);
+  }) async {
+    await FhirDb._fhirDb._ensureInit(pw: pw);
+    return await historyRecorder.saveRecord(resource: resource, pw: pw);
+  }
 
   Future<bool> exists({
     required R4ResourceType resourceType,
@@ -833,7 +835,6 @@ class DefaultHistoryRecorder extends HistoryRecorder {
     String? pw,
   }) async {
     try {
-      await FhirDb._fhirDb._ensureInit(pw: pw);
       final HiveAesCipher? cipher = cipherFromKey(key: pw);
       Box<Map<dynamic, dynamic>> box;
       if (!Hive.isBoxOpen('history')) {
